@@ -7,8 +7,8 @@ export default function Header() {
   return (
     <a href="https://github.com/austintgriffith/scaffold-eth" target="_blank" rel="noopener noreferrer">
       <PageHeader
-        title="🏗 scaffold-eth"
-        subTitle="🖼 NFT example"
+        title="Remix NFT"
+        subTitle="The creator's remixable NFT revolution!"
         style={{ cursor: "pointer" }}
       />
     </a>

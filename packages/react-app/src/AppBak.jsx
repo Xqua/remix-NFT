@@ -6,7 +6,7 @@ import ReactJson from "react-json-view";
 import { BrowserRouter, Link, Route, Switch } from "react-router-dom";
 import Web3Modal from "web3modal";
 import "./App.css";
-import { Account, Address, AddressInput, Contract, Faucet, GasGauge, Header, Ramp, ThemeSwitch, DeployRemix, RemixCard } from "./components";
+import { Account, Address, AddressInput, Contract, Faucet, GasGauge, Header, Ramp, ThemeSwitch } from "./components";
 import {INFURA_ID, NETWORK, NETWORKS } from "./constants";
 import { Transactor } from "./helpers";
 import {
@@ -135,7 +135,6 @@ function App(props) {
 
   const [injectedProvider, setInjectedProvider] = useState();
   const [address, setAddress] = useState();
-  const [remixContract, setRemixContract] = useState();
   /* 💵 This hook will get the price of ETH from 🦄 Uniswap: */
   const price = useExchangePrice(targetNetwork, mainnetProvider);
 
@@ -190,104 +189,46 @@ function App(props) {
   });
 
   // Then read your DAI balance like:
-    const myMainnetDAIBalance = useContractReader(mainnetContracts, "DAI", "balanceOf", [
-      "0x34aA3F359A9D614239015126635CE7732c18fDF3",
-    ]);
+  const myMainnetDAIBalance = useContractReader(mainnetContracts, "DAI", "balanceOf", [
+    "0x34aA3F359A9D614239015126635CE7732c18fDF3",
+  ]);
 
   // 📟 Listen for broadcast events
-  const mintEvents = useEventListener(readContracts, "RemixRegistry", "Mint", localProvider, 1);
-  
-  //let collectiblesCount = useContractReader(readContracts, "YourCollectible", "getCurrentTokenID");
-  //const numberCollectiblesCount = collectiblesCount && collectiblesCount.toNumber && collectiblesCount.toNumber();
-  const [remixContracts, setRemixContracts] = useState({});
-  const [myRemixContracts, setMyRemixContracts] = useState({});
+  const transferEvents = useEventListener(readContracts, "YourCollectible", "TransferSingle", localProvider, 1);
 
-  const readJSONFromIPFS = async (uri) => {
-    const ipfsHash = uri.replace("https://ipfs.io/ipfs/", "");
-    try {
-      const jsonManifestBuffer = await getFromIPFS(ipfsHash);
-      const jsonManifest = JSON.parse(jsonManifestBuffer.toString());
-      return jsonManifest;
-    } catch (e) {
-      console.log("Error reading JSON from IPFS", e);
-      return {};
-    }
-  }
+  let collectiblesCount = useContractReader(readContracts, "YourCollectible", "getCurrentTokenID");
+  const numberCollectiblesCount = collectiblesCount && collectiblesCount.toNumber && collectiblesCount.toNumber();
+  const [yourCollectibles, setYourCollectibles] = useState();
 
   useEffect(() => {
-    const updateRMX = async () => {
-      console.log("updating RMX tokens!")
-      if (selectedChainId && address) {
-        let remixArtifact = require("./contracts/Remix.json");
-        setRemixContracts(remixArtifact);
-        const newRemixes = {}
-        const newMyRemixes = {}
-        for (let i = 0; i < mintEvents.length; i++) {
-          let mintEvent = mintEvents[i];
-          let remix = {}
-          if (!remixContracts[mintEvent.remixContract]) {
-            remix.contract = new ethers.Contract(mintEvent.remixContract, remixArtifact.abi, userSigner)
-            remix.id = i;
-            remix.address = await remix.contract.address;
-            const authorsAndSplits = await remix.contract.getAuthors();
-            remix.authors = authorsAndSplits[0];
-            remix.authorsSplits = authorsAndSplits[1];
-            const parentsAndSplits = await remix.contract.getParents();
-            remix.parents = parentsAndSplits[0];
-            remix.parentsSplits = parentsAndSplits[1];
-            remix.canDerive = await remix.contract.licenseActive(address);
-            remix.uri = await remix.contract.uri(0);
-            remix.CollectiblePrice = await remix.contract.collectiblePrice();
-            remix.RMXPrice = await remix.contract.minPurchasePrice();
-            remix.Collectible_metadata = await readJSONFromIPFS(remix.uri.replace(/{(.*?)}/, 1))
-            remix.RMX_metadata = await readJSONFromIPFS(remix.uri.replace(/{(.*?)}/, 0))
-            console.log("new Remix: ", remix)
-            newRemixes[remix.address] = remix;
-          } else {
-            remix = remixContracts[mintEvent.remixContract];
-          } 
-          newRemixes[remix.address] = remix;
-          if (remix.canDerive) {
-            newMyRemixes[remix.address] = remix;
-          }
-        }
-        setRemixContracts(newRemixes);
-        setMyRemixContracts(newMyRemixes);
-      }
-    }
-    console.log("Starting await updateRMX");
-    updateRMX(); 
-  }, [address, mintEvents, selectedChainId])
-
-  // useEffect(() => {
-  //   const updateCollectibles = async () => {
-  //     const collectiblesUpdate = [];
+    const updateCollectibles = async () => {
+      const collectiblesUpdate = [];
     
-  //     for (let collectibleIndex = 0; collectibleIndex < numberCollectiblesCount; collectibleIndex++) {
-  //       try {
-  //         let tokenSupply = await readContracts.Remix.tokenSupply(collectibleIndex);
-  //         let owned = await readContracts.Remix.balanceOf(address, collectibleIndex);
+      for (let collectibleIndex = 0; collectibleIndex < numberCollectiblesCount; collectibleIndex++) {
+        try {
+          let tokenSupply = await readContracts.YourCollectible.tokenSupply(collectibleIndex);
+          let owned = await readContracts.YourCollectible.balanceOf(address, collectibleIndex);
 
-  //         let uri = await readContracts.Remix.uri(0); //All tokens have the same base uri
-  //         uri = uri.replace(/{(.*?)}/, collectibleIndex);
-  //         const ipfsHash = uri.replace("https://ipfs.io/ipfs/", "");
-  //         const jsonManifestBuffer = await getFromIPFS(ipfsHash);
+          let uri = await readContracts.YourCollectible.uri(0); //All tokens have the same base uri
+          uri = uri.replace(/{(.*?)}/, collectibleIndex);
+          const ipfsHash = uri.replace("https://ipfs.io/ipfs/", "");
+          const jsonManifestBuffer = await getFromIPFS(ipfsHash);
 
-          // try {
-          //   const jsonManifest =JSON.parse(jsonManifestBuffer.toString());
-          //   collectiblesUpdate.push({ id: collectibleIndex, supply:tokenSupply, owned:owned, name: jsonManifest.name, description: jsonManifest.description, image:jsonManifest.image });
-          // } catch (e) {
-          //   console.log(e);
-          // }
+          try {
+            const jsonManifest =JSON.parse(jsonManifestBuffer.toString());
+            collectiblesUpdate.push({ id: collectibleIndex, supply:tokenSupply, owned:owned, name: jsonManifest.name, description: jsonManifest.description, image:jsonManifest.image });
+          } catch (e) {
+            console.log(e);
+          }
 
-  //       } catch (e) {
-  //         console.log(e);
-  //       }
-  //     }
-  //     setRemixes(collectiblesUpdate);
-  //   };
-  //   updateCollectibles();
-  // }, [numberCollectiblesCount, yourLocalBalance]);
+        } catch (e) {
+          console.log(e);
+        }
+      }
+      setYourCollectibles(collectiblesUpdate);
+    };
+    updateCollectibles();
+  }, [numberCollectiblesCount, yourLocalBalance]);
 
   /*
   const addressFromENS = useResolveName(mainnetProvider, "austingriffith.eth");
@@ -307,9 +248,7 @@ function App(props) {
       yourMainnetBalance &&
       readContracts &&
       writeContracts &&
-      mainnetContracts &&
-      mintEvents && 
-      remixContracts
+      mainnetContracts
     ) {
       console.log("_____________________________________ 🏗 scaffold-eth _____________________________________");
       console.log("🌎 mainnetProvider", mainnetProvider);
@@ -322,8 +261,6 @@ function App(props) {
       console.log("🌍 DAI contract on mainnet:", mainnetContracts);
       console.log("💵 yourMainnetDAIBalance", myMainnetDAIBalance);
       console.log("🔐 writeContracts", writeContracts);
-      console.log("🔐 events", mintEvents);
-      console.log("🔐 Contracts", remixContracts);
     }
   }, [
     mainnetProvider,
@@ -334,7 +271,6 @@ function App(props) {
     readContracts,
     writeContracts,
     mainnetContracts,
-    mintEvents,
   ]);
 
   let networkDisplay = "";
@@ -469,17 +405,37 @@ function App(props) {
               }}
               to="/"
             >
-              Remixes
+              YourCollectibles
             </Link>
           </Menu.Item>
-          <Menu.Item key="/mint">
+          <Menu.Item key="/transfers">
             <Link
               onClick={() => {
-                setRoute("/mint");
+                setRoute("/transfers");
               }}
-              to="/mint"
+              to="/transfers"
             >
-              Mint
+              Transfers
+            </Link>
+          </Menu.Item>
+          <Menu.Item key="/ipfsup">
+            <Link
+              onClick={() => {
+                setRoute("/ipfsup");
+              }}
+              to="/ipfsup"
+            >
+              IPFS Upload
+            </Link>
+          </Menu.Item>
+          <Menu.Item key="/ipfsdown">
+            <Link
+              onClick={() => {
+                setRoute("/ipfsdown");
+              }}
+              to="/ipfsdown"
+            >
+              IPFS Download
             </Link>
           </Menu.Item>
           <Menu.Item key="/debugcontracts">
@@ -501,33 +457,151 @@ function App(props) {
                 this <Contract/> component will automatically parse your ABI
                 and give you a form to interact with it locally
             */}
-            <div style={{ width: 1200, margin: "auto", marginTop: 32, paddingBottom: 32 }}>
+            <div style={{ width: 640, margin: "auto", marginTop: 32, paddingBottom: 32 }}>
               <List
-                grid={{ gutter: 20, column: 4 }}
-                dataSource={Object.keys(remixContracts).map((address) => (remixContracts[address]))}
+                bordered
+                dataSource={yourCollectibles}
                 renderItem={item => {
                   const id = item.id;
                   return (
-                    <List.Item key={id}>
-                      <RemixCard remix={item} />
+                    <List.Item key={id + "_" + item.uri + "_" + item.owner}>
+                      <Card
+                        title={
+                          <div>
+                            <span style={{ fontSize: 16, marginRight: 8 }}>#{id}</span> {item.name}
+                          </div>
+                        }
+                      >
+                        <div>
+                          <img src={item.image} style={{ maxWidth: 150 }} />
+                        </div>
+                        <div>{item.description}</div>
+                      </Card>
+
+                      <div>
+                        owned: {item.owned.toNumber()} of {item.supply.toNumber()}
+                        <AddressInput
+                          ensProvider={mainnetProvider}
+                          placeholder="transfer to address"
+                          value={transferToAddresses[id]}
+                          onChange={newValue => {
+                            const update = {};
+                            update[id] = newValue;
+                            setTransferToAddresses({ ...transferToAddresses, ...update });
+                          }}
+                        />
+                        <Button
+                          onClick={() => {
+                            console.log("writeContracts", writeContracts);
+                            tx(writeContracts.YourCollectible.safeTransferFrom(address, transferToAddresses[id], id, 1, []));
+                          }}
+                        >
+                          Transfer
+                        </Button>
+                      </div>
                     </List.Item>
                   );
                 }}
               />
             </div>
           </Route>
-          <Route path="/mint">
-            <DeployRemix
-              address={address}
-              myRemixes={myRemixContracts}
-              writeContracts={writeContracts}
-              contract={remixContract}
-              signer={userSigner}
-            />
+
+          <Route path="/transfers">
+            <div style={{ width: 600, margin: "auto", marginTop: 32, paddingBottom: 32 }}>
+              <List
+                bordered
+                dataSource={transferEvents}
+                renderItem={item => {
+                  return (
+                    <List.Item key={item[1] + "_" + item[2] + "_" + item.blockNumber + "_" + item[3].toNumber()}>
+                      <span style={{ fontSize: 16, marginRight: 8 }}>#{item[3].toNumber()}</span>
+                      <Address address={item[1]} ensProvider={mainnetProvider} fontSize={16} /> =&gt;
+                      <Address address={item[2]} ensProvider={mainnetProvider} fontSize={16} />
+                      <span style={{ fontSize: 16, marginRight: 8 }}>Amount: {item[4].toNumber()}</span>
+                    </List.Item>
+                  );
+                }}
+              />
+            </div>
+          </Route>
+
+          <Route path="/ipfsup">
+            <div style={{ paddingTop: 32, width: 740, margin: "auto", textAlign: "left" }}>
+              <ReactJson
+                style={{ padding: 8 }}
+                src={yourJSON}
+                theme="pop"
+                enableClipboard={false}
+                onEdit={(edit, a) => {
+                  setYourJSON(edit.updated_src);
+                }}
+                onAdd={(add, a) => {
+                  setYourJSON(add.updated_src);
+                }}
+                onDelete={(del, a) => {
+                  setYourJSON(del.updated_src);
+                }}
+              />
+            </div>
+
+            <Button
+              style={{ margin: 8 }}
+              loading={sending}
+              size="large"
+              shape="round"
+              type="primary"
+              onClick={async () => {
+                console.log("UPLOADING...", yourJSON);
+                setSending(true);
+                setIpfsHash();
+                const result = await ipfs.add(JSON.stringify(yourJSON)); // addToIPFS(JSON.stringify(yourJSON))
+                if (result && result.path) {
+                  setIpfsHash(result.path);
+                }
+                setSending(false);
+                console.log("RESULT:", result);
+              }}
+            >
+              Upload to IPFS
+            </Button>
+
+            <div style={{ padding: 16, paddingBottom: 150 }}>{ipfsHash}</div>
+          </Route>
+          <Route path="/ipfsdown">
+            <div style={{ paddingTop: 32, width: 740, margin: "auto" }}>
+              <Input
+                value={ipfsDownHash}
+                placeHolder="IPFS hash (like QmadqNw8zkdrrwdtPFK1pLi8PPxmkQ4pDJXY8ozHtz6tZq)"
+                onChange={e => {
+                  setIpfsDownHash(e.target.value);
+                }}
+              />
+            </div>
+            <Button
+              style={{ margin: 8 }}
+              loading={sending}
+              size="large"
+              shape="round"
+              type="primary"
+              onClick={async () => {
+                console.log("DOWNLOADING...", ipfsDownHash);
+                setDownloading(true);
+                setIpfsContent();
+                const result = await getFromIPFS(ipfsDownHash); // addToIPFS(JSON.stringify(yourJSON))
+                if (result && result.toString) {
+                  setIpfsContent(result.toString());
+                }
+                setDownloading(false);
+              }}
+            >
+              Download from IPFS
+            </Button>
+
+            <pre style={{ padding: 16, width: 500, margin: "auto", paddingBottom: 150 }}>{ipfsContent}</pre>
           </Route>
           <Route path="/debugcontracts">
             <Contract
-              name="Remix"
+              name="YourCollectible"
               signer={userSigner}
               provider={localProvider}
               address={address}
