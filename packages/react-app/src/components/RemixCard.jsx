@@ -1,10 +1,19 @@
 import React, {useState, useEffect} from "react";
+import { useHistory } from "react-router-dom";
 import { Divider, Card, Row, Col, Statistic } from 'antd';
 import { DollarOutlined, ShareAltOutlined, FileImageOutlined, EditOutlined } from '@ant-design/icons';
 import Blockies from "react-blockies";
+import {
+    useContractLoader,
+} from "../hooks";
+
 
 export default function RemixCard(props) {
     const [remix, setRemix] = useState(props.remix);
+
+    let history = useHistory();
+    
+    const writeContract = useContractLoader(props.signer, { chainId: props.localChainId, customAddresses: { "Remix": remix.address } }); 
 
     useEffect(() => {
         setRemix(props.remix)
@@ -26,9 +35,9 @@ export default function RemixCard(props) {
                 />
             }
             actions={[
-                <DollarOutlined key="Collectible"/>,
+                <FileImageOutlined key="Collectible"/>,
                 <DollarOutlined key="RMX" />,
-                <FileImageOutlined key="edit" />
+                <EditOutlined key="edit" onClick={() => { props.onDebug(writeContract["Remix"]); history.push("/debugcontracts")}} />
             ]}
         >
             <Meta

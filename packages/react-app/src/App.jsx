@@ -136,6 +136,9 @@ function App(props) {
   const [injectedProvider, setInjectedProvider] = useState();
   const [address, setAddress] = useState();
   const [remixContract, setRemixContract] = useState();
+  const [selectedContract, setSelectedContract] = useState();
+
+
   /* 💵 This hook will get the price of ETH from 🦄 Uniswap: */
   const price = useExchangePrice(targetNetwork, mainnetProvider);
 
@@ -258,41 +261,6 @@ function App(props) {
     console.log("Starting await updateRMX");
     updateRMX(); 
   }, [address, mintEvents, selectedChainId])
-
-  // useEffect(() => {
-  //   const updateCollectibles = async () => {
-  //     const collectiblesUpdate = [];
-    
-  //     for (let collectibleIndex = 0; collectibleIndex < numberCollectiblesCount; collectibleIndex++) {
-  //       try {
-  //         let tokenSupply = await readContracts.Remix.tokenSupply(collectibleIndex);
-  //         let owned = await readContracts.Remix.balanceOf(address, collectibleIndex);
-
-  //         let uri = await readContracts.Remix.uri(0); //All tokens have the same base uri
-  //         uri = uri.replace(/{(.*?)}/, collectibleIndex);
-  //         const ipfsHash = uri.replace("https://ipfs.io/ipfs/", "");
-  //         const jsonManifestBuffer = await getFromIPFS(ipfsHash);
-
-          // try {
-          //   const jsonManifest =JSON.parse(jsonManifestBuffer.toString());
-          //   collectiblesUpdate.push({ id: collectibleIndex, supply:tokenSupply, owned:owned, name: jsonManifest.name, description: jsonManifest.description, image:jsonManifest.image });
-          // } catch (e) {
-          //   console.log(e);
-          // }
-
-  //       } catch (e) {
-  //         console.log(e);
-  //       }
-  //     }
-  //     setRemixes(collectiblesUpdate);
-  //   };
-  //   updateCollectibles();
-  // }, [numberCollectiblesCount, yourLocalBalance]);
-
-  /*
-  const addressFromENS = useResolveName(mainnetProvider, "austingriffith.eth");
-  console.log("🏷 Resolved austingriffith.eth as:",addressFromENS)
-  */
 
   //
   // 🧫 DEBUG 👨🏻‍🔬
@@ -509,7 +477,14 @@ function App(props) {
                   const id = item.id;
                   return (
                     <List.Item key={id}>
-                      <RemixCard remix={item} />
+                      <RemixCard 
+                        remix={item} 
+                        signer={userSigner}
+                        localChainId={localChainId}
+                        onDebug={(contract) => { 
+                          setSelectedContract(contract); 
+                          setRoute("/debugcontracts");
+                          }}/>
                     </List.Item>
                   );
                 }}
@@ -527,6 +502,7 @@ function App(props) {
           </Route>
           <Route path="/debugcontracts">
             <Contract
+              customContract={selectedContract}
               name="Remix"
               signer={userSigner}
               provider={localProvider}
