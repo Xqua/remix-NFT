@@ -22,7 +22,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   });
 
   const registry = await ethers.getContract("RemixRegistry", deployer);
-  const authors = ["0xF0552F71fDdd72ae6d0F59EfE3fCcFFc39aF21FF"];
+  const authors = [deployer];
   args = [
     tokenUri_1,   // string memory uri_,
     authors,  // address[] memory _authors,
