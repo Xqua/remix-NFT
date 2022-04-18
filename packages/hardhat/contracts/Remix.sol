@@ -131,7 +131,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
             splitAddresses.push(_parents[_j]); /*Add split address for each parent token*/
             splits[_parents[_j]] = _parentSplits[_j]; /*Add split amount for each parent token*/
             _splitSum += _parentSplits[_j]; /*Add splits to working sum*/
-            //require(IRemix(_parents[_j]).requestDerivative(msg.sender)); /*Request derivatives from each specified parent*/
+            require(IRemix(_parents[_j]).requestDerivative(msg.sender)); /*Request derivatives from each specified parent*/
         }
 
         require(_splitSum == 10000, "!split total"); /*Ensure valid split total*/

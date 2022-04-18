@@ -26,9 +26,9 @@ export default function RemixCard(props) {
                 />
             }
             actions={[
-                <FileImageOutlined key="Collectible"/>,
-                <ShareAltOutlined key="RMX" />,
-                <EditOutlined key="edit" />
+                <DollarOutlined key="Collectible"/>,
+                <DollarOutlined key="RMX" />,
+                <FileImageOutlined key="edit" />
             ]}
         >
             <Meta

@@ -21,42 +21,45 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log: true,
   });
 
-  // const registry = await ethers.getContract("RemixRegistry", deployer);
-  // const authors = ["0xF0552F71fDdd72ae6d0F59EfE3fCcFFc39aF21FF"];
-  // args = [
-  //   tokenUri_1,   // string memory uri_,
-  //   authors,  // address[] memory _authors,
-  //   [10000],// uint256[] memory _authorSplits,
-  //   [], // address[] memory _parents,
-  //   [], // uint256[] memory _parentSplits,
-  //   1000, // uint256 _startingPrice,
-  //   1000, // uint256 _increasePoints,
-  //   10000, // uint256 _collectiblePrice,
-  //   10000, // uint256 _rmxCountdown,
-  //   100] // uint256 _royalties
+  const registry = await ethers.getContract("RemixRegistry", deployer);
+  const authors = ["0xF0552F71fDdd72ae6d0F59EfE3fCcFFc39aF21FF"];
+  args = [
+    tokenUri_1,   // string memory uri_,
+    authors,  // address[] memory _authors,
+    [10000],// uint256[] memory _authorSplits,
+    [], // address[] memory _parents,
+    [], // uint256[] memory _parentSplits,
+    1000, // uint256 _startingPrice,
+    1000, // uint256 _increasePoints,
+    10000, // uint256 _collectiblePrice,
+    10000, // uint256 _rmxCountdown,
+    100] // uint256 _royalties
 
 
-  // console.log("Deployer is:", deployer)
+  console.log("Deployer is:", deployer)
 
-  // const remix1 = await deploy("Remix", {
-  //   // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
-  //   from: deployer,
-  //   args: args,
-  //   log: true,
-  // });
+  const remix1 = await deploy("Remix", {
+    // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
+    from: deployer,
+    args: args,
+    log: true,
+  });
 
-  // await registry.registerRemix(args[1], remix1.address);
+  await registry.registerRemix(args[1], remix1.address);
 
-  // args[0] = tokenUri_2;
+  args[0] = tokenUri_2;
+  args[2][0] = 9000;
+  args[3].push(remix1.address)
+  args[4].push(1000);
 
-  // const remix2 = await deploy("Remix", {
-  //   // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
-  //   from: deployer,
-  //   args: args,
-  //   log: true,
-  // });
+  const remix2 = await deploy("Remix", {
+    // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
+    from: deployer,
+    args: args,
+    log: true,
+  });
 
-  // await registry.registerRemix(args[1], remix2.address);
+  await registry.registerRemix(args[1], remix2.address);
 
 
   // args[0] = tokenUri_3;
