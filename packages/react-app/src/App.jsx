@@ -1,12 +1,14 @@
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import { Alert, Button, Card, Col, Input, List, Menu, Row } from "antd";
 import "antd/dist/antd.css";
-import React, { useCallback, useEffect, useState } from "react";
+import { getAddress } from "ethers/lib/utils";
+import React, { useCallback, useEffect, useState, useContext } from "react";
 import ReactJson from "react-json-view";
 import { BrowserRouter, Link, Route, Switch } from "react-router-dom";
 import Web3Modal from "web3modal";
 import "./App.css";
 import { Account, Address, AddressInput, Contract, Faucet, GasGauge, Header, Ramp, ThemeSwitch, DeployRemix, RemixCard } from "./components";
+import RemixContainer from "./components/RemixContainer";
 import {INFURA_ID, NETWORK, NETWORKS } from "./constants";
 import { Transactor } from "./helpers";
 import {
@@ -18,7 +20,9 @@ import {
   useGasPrice,
   useOnBlock,
   useUserSigner,
+  useRemix
 } from "./hooks";
+import { RemixContext } from "./helpers";
 
 const { BufferList } = require("bl");
 // https://www.npmjs.com/package/ipfs-http-client
@@ -73,18 +77,7 @@ const STARTING_JSON = {
 
 // helper function to "Get" from IPFS
 // you usually go content.toString() after this...
-const getFromIPFS = async hashToGet => {
-  for await (const file of ipfs.get(hashToGet)) {
-    console.log(file.path);
-    if (!file.content) continue;
-    const content = new BufferList();
-    for await (const chunk of file.content) {
-      content.append(chunk);
-    }
-    console.log(content);
-    return content;
-  }
-};
+
 
 // 🛰 providers
 if (DEBUG) console.log("📡 Connecting to Mainnet Ethereum");
@@ -135,8 +128,10 @@ function App(props) {
 
   const [injectedProvider, setInjectedProvider] = useState();
   const [address, setAddress] = useState();
-  const [remixContract, setRemixContract] = useState();
   const [selectedContract, setSelectedContract] = useState();
+  const [remixContext, setRemixContext] = useState();
+
+
 
 
   /* 💵 This hook will get the price of ETH from 🦄 Uniswap: */
@@ -198,69 +193,38 @@ function App(props) {
     ]);
 
   // 📟 Listen for broadcast events
-  const mintEvents = useEventListener(readContracts, "RemixRegistry", "Mint", localProvider, 1);
+  const mintEvents = useEventListener(readContracts, "RemixRegistry", "NewRemix", localProvider, 1);
   
   //let collectiblesCount = useContractReader(readContracts, "YourCollectible", "getCurrentTokenID");
   //const numberCollectiblesCount = collectiblesCount && collectiblesCount.toNumber && collectiblesCount.toNumber();
-  const [remixContracts, setRemixContracts] = useState({});
-  const [myRemixContracts, setMyRemixContracts] = useState({});
+  
+  const remixContracts = useRemix(localProvider, readContracts, userSigner)
+  useEffect(() => {
+    setRemixContext(remixContracts)
+  }, [remixContracts])
 
-  const readJSONFromIPFS = async (uri) => {
-    const ipfsHash = uri.replace("https://ipfs.io/ipfs/", "");
-    try {
-      const jsonManifestBuffer = await getFromIPFS(ipfsHash);
-      const jsonManifest = JSON.parse(jsonManifestBuffer.toString());
-      return jsonManifest;
-    } catch (e) {
-      console.log("Error reading JSON from IPFS", e);
-      return {};
-    }
+  const GetRemix = (address) => {
+    return useRemix(address)
   }
 
-  useEffect(() => {
-    const updateRMX = async () => {
-      console.log("updating RMX tokens!")
-      if (selectedChainId && address) {
-        let remixArtifact = require("./contracts/Remix.json");
-        setRemixContracts(remixArtifact);
-        const newRemixes = {}
-        const newMyRemixes = {}
-        for (let i = 0; i < mintEvents.length; i++) {
-          let mintEvent = mintEvents[i];
-          let remix = {}
-          if (!remixContracts[mintEvent.remixContract]) {
-            remix.contract = new ethers.Contract(mintEvent.remixContract, remixArtifact.abi, userSigner)
-            remix.id = i;
-            remix.address = await remix.contract.address;
-            const authorsAndSplits = await remix.contract.getAuthors();
-            remix.authors = authorsAndSplits[0];
-            remix.authorsSplits = authorsAndSplits[1];
-            const parentsAndSplits = await remix.contract.getParents();
-            remix.parents = parentsAndSplits[0];
-            remix.parentsSplits = parentsAndSplits[1];
-            remix.canDerive = await remix.contract.licenseActive(address);
-            remix.uri = await remix.contract.uri(0);
-            remix.CollectiblePrice = await remix.contract.collectiblePrice();
-            remix.RMXPrice = await remix.contract.minPurchasePrice();
-            remix.Collectible_metadata = await readJSONFromIPFS(remix.uri.replace(/{(.*?)}/, 1))
-            remix.RMX_metadata = await readJSONFromIPFS(remix.uri.replace(/{(.*?)}/, 0))
-            console.log("new Remix: ", remix)
-            newRemixes[remix.address] = remix;
-          } else {
-            remix = remixContracts[mintEvent.remixContract];
-          } 
-          newRemixes[remix.address] = remix;
-          if (remix.canDerive) {
-            newMyRemixes[remix.address] = remix;
-          }
-        }
-        setRemixContracts(newRemixes);
-        setMyRemixContracts(newMyRemixes);
-      }
-    }
-    console.log("Starting await updateRMX");
-    updateRMX(); 
-  }, [address, mintEvents, selectedChainId])
+  // useEffect(() => {
+  //   const updateRMX = async () => {
+  //     console.log("new Mint Events!")
+  //     if (selectedChainId && address) {
+  //       let remixArtifact = require("./contracts/Remix.json");
+  //       setRemixContracts(remixArtifact);
+  //       for (let i = 0; i < mintEvents.length; i++) {
+  //         let mintEvent = mintEvents[i];
+  //         if (!remixContracts[mintEvent.remixContract]) {
+  //           remixContracts[mintEvent.remixContract] = GetRemix(mintEvent.remixContract);
+  //         } 
+  //       }
+  //       setRemixContracts({ ...remixContract });
+  //     }
+  //   }
+  //   console.log("Starting await updateRMX");
+  //   updateRMX(); 
+  // }, [address, mintEvents, selectedChainId])
 
   //
   // 🧫 DEBUG 👨🏻‍🔬
@@ -291,7 +255,7 @@ function App(props) {
       console.log("💵 yourMainnetDAIBalance", myMainnetDAIBalance);
       console.log("🔐 writeContracts", writeContracts);
       console.log("🔐 events", mintEvents);
-      console.log("🔐 Contracts", remixContracts);
+      console.log("🔐 Remix Contracts", remixContracts);
     }
   }, [
     mainnetProvider,
@@ -303,6 +267,7 @@ function App(props) {
     writeContracts,
     mainnetContracts,
     mintEvents,
+    remixContracts
   ]);
 
   let networkDisplay = "";
@@ -423,7 +388,12 @@ function App(props) {
 
   const [transferToAddresses, setTransferToAddresses] = useState({});
 
+  useEffect(() => {
+    setSelectedContract((Object.keys(remixContracts)[0]))
+  }, [remixContracts])
+
   return (
+    <RemixContext.Provider value={[remixContext, setRemixContext]} >
     <div className="App">
       {/* ✏️ Edit the header and change the title to your project name */}
       <Header />
@@ -460,6 +430,16 @@ function App(props) {
               Debug Contracts
             </Link>
           </Menu.Item>
+          <Menu.Item key="/one">
+            <Link
+              onClick={() => {
+                setRoute("/one");
+              }}
+              to="/one"
+            >
+              Show one
+            </Link>
+          </Menu.Item>
         </Menu>
 
         <Switch>
@@ -479,10 +459,8 @@ function App(props) {
                     <List.Item key={id}>
                       <RemixCard 
                         remix={item} 
-                        signer={userSigner}
-                        localChainId={localChainId}
-                        onDebug={(contract) => { 
-                          setSelectedContract(contract); 
+                        onDebug={(address) => { 
+                          setSelectedContract(address); 
                           setRoute("/debugcontracts");
                           }}/>
                     </List.Item>
@@ -494,21 +472,25 @@ function App(props) {
           <Route path="/mint">
             <DeployRemix
               address={address}
-              myRemixes={myRemixContracts}
-              writeContracts={writeContracts}
-              contract={remixContract}
+              remixContracts={Object.keys(remixContracts).map((remix) => (remixContracts[remix])).filter((remix) => remix.canDerive)}
+              remixRegistry={writeContracts ? writeContracts["RemixRegistry"] : null}
               signer={userSigner}
             />
           </Route>
           <Route path="/debugcontracts">
             <Contract
-              customContract={selectedContract}
+              customAddress={selectedContract}
               name="Remix"
               signer={userSigner}
               provider={localProvider}
               address={address}
               blockExplorer={blockExplorer}
             />
+          </Route>
+          <Route path="/one" >
+            {selectedContract ? 
+              <RemixContainer remix={remixContracts[selectedContract]} />
+            : null}
           </Route>
         </Switch>
       </BrowserRouter>
@@ -571,6 +553,7 @@ function App(props) {
         </Row>
       </div>
     </div>
+    </RemixContext.Provider>
   );
 }
 

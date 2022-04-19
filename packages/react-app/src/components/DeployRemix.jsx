@@ -1,20 +1,8 @@
-import { Spin, Typography, Collapse, Button, Form, Input, InputNumber, List, Avatar, Row, Col, Divider } from "antd";
-import { AddressInput } from ".";
+import { notification, Spin, Typography, Collapse, Button, Form, Input, InputNumber, List, Avatar, Row, Col, Divider } from "antd";
 import React, {useState, useEffect } from "react";
 import { FileImageOutlined, SettingOutlined, EditOutlined, UserAddOutlined, UserDeleteOutlined, DeleteOutlined } from '@ant-design/icons';
-import {
-  useBalance,
-  useContractLoader,
-  useContractReader,
-  useEventListener,
-  useExchangePrice,
-  useGasPrice,
-  useOnBlock,
-  useUserSigner,
-} from "../hooks";
-import { forEach } from "../contracts/contracts";
-import { UploadRemixFiles } from "../components";
-
+import { UploadRemixFiles, ParentSplitField, AddressField, RemixListItem } from "../components";
+import { Remix } from "../helpers";
 
 const { BufferList } = require('bl')
 const ipfsAPI = require('ipfs-http-client');
@@ -22,104 +10,27 @@ const ipfs = ipfsAPI({ host: 'ipfs.infura.io', port: '5001', protocol: 'https' }
 
 const { ethers } = require("ethers");
 
-function AddressField(props) {
-  console.log("From AddressField:", props.author);
-  const [address, setAddress] = useState(props.author.address);
-  const [split, setSplit] = useState(props.author.split ? props.author.split : 0);
 
-  useEffect(() => {
-    props.author.address = address;
-    props.onChange({...props.author})
-  }, [address])
-  
-  useEffect(() => {
-    props.author.split = split;
-    props.onChange({...props.author})
-  }, [split])
-
-  return (
-    <Row justify="space-between" align="middle"> 
-    <Col span={12}>
-      <Form.Item
-        label="Author"
-        name={"author" + props.author.key}
-        labelCol={{span:8}}
-        wrapperCol={{span:24}}
-        rules={[{ required: true, message: 'Please input the address of the author!' }]}
-      >
-        <AddressInput
-          //ensProvider={mainnetProvider} Will need to do this!
-          value={props.author.address}
-          onChange={setAddress}
-        />
-      </Form.Item>
-      </Col>
-      <Col span={10}>
-      <Form.Item
-        label="Split"
-        name={"authorSplit" + props.author.key}
-        rules={[{ required: true, message: 'Please give a split amount to this author!' }]}
-      >
-        <InputNumber 
-          values={props.author.split}
-          onChange={setSplit}/>
-      </Form.Item>
-    </Col>
-    <Col span={2} >
-      {props.author.key != 0 ? <Button icon={<UserDeleteOutlined />} onClick={() => { props.onDelete(props.author)}} /> : null }
-    </Col>
-    <Divider />
-  </Row>
-)}
-
-function ParentSplitField(props) {
-  const [split, setSplit] = useState(props.split)
-  const parent = props.parent;
-  useEffect(() => {
-    parent.split = split;
-    props.onChange(parent);
-  }, [split])
-
-  return (
-    <Row >
-      <Col span={12}>
-        <Avatar src={parent.RMX_metadata.image} /> {parent.RMX_metadata.name}
-      </Col>
-      <Col span={10}>
-        <Form.Item
-          label="Split"
-          name={"parent_" + parent.address}
-          values={split}
-          rules={[{ required: true, message: 'Please give a split amount to this author!' }]}
-        >
-          <InputNumber onChange={setSplit}/>
-        </Form.Item>
-      </Col>
-      <Col span={2}>
-        <Button icon={<DeleteOutlined />} onClick={() => {props.onDelete(parent)}} />
-      </Col>
-      <Divider />
-    </Row>
-  )
-}
 
 // @props.address: The address of the person logged in
 export default function DeployRemix(props) {
-  const [myRemixes, setMyRemixes] = useState(props.myRemixes);
+  const [remixContracts, setRemixContracts] = useState(props.remixContracts);
+  const [remixRegistry, setRemixRegistry] = useState(props.remixRegistry)
+  const [signer, setSigner] = useState(props.signer)
   const [isDeploying, setIsDeploying] = useState();
-  const [tokenURI, setTokenURI] = useState();
   const [parents, setParents] = useState([]);
   const [authors, setAuthors] = useState([]);
   const [addressFields, setAddressFields] = useState([]);
   const [parentsSplitFields, setParentsSplitFields] = useState([]);
-  const [collectible, setCollectible] = useState({});
-  const [remix, setRemix] = useState({});
+  const [collectibleMetadata, setCollectibleMetadata] = useState({});
+  const [remixMetadata, setRemixMetadata] = useState({});
 
   const { Panel } = Collapse;
   const { Title } = Typography;
   const { TextArea } = Input;
 
-  
+  useEffect(() => { setSigner(props.signer) }, [props.signer])
+  useEffect(() => { setRemixRegistry(props.remixRegistry) }, [props.remixRegistry])
 
   const updateAuthors = (authors) => {
     const newAuthors = authors.map((author, key) => {author.key = key; return author});
@@ -188,23 +99,8 @@ export default function DeployRemix(props) {
   }, [authors])
 
   useEffect(() => {
-    setMyRemixes(props.myRemixes)
-  }, [props.myRemixes])
-
-  const buildArgs = (values, uri) => {
-    const args = []
-    args.push(uri)
-    args.push(authors.map((author) => (author.address)))
-    args.push(authors.map((author) => (author.split * 100)))
-    args.push(parents.map((parent) => (parent.address)))
-    args.push(parents.map((parent) => (parent.split * 100)))
-    args.push(values.RMXprice)
-    args.push(values.RMXincrease)
-    args.push(values.NFTprice)
-    args.push(10000)
-    args.push(1000)
-    return args;
-  }
+    setRemixContracts(props.remixContracts)
+  }, [props.remixContracts])
 
   const isInParents = (address) => {
     let exists = false; 
@@ -216,45 +112,67 @@ export default function DeployRemix(props) {
     return exists;
   }
 
-  const deploy = async (values) => {
-    let files = []
-    files.push({
-      path: "metadata/0.json",
-      content: JSON.stringify(remix),
-    })
-    files.push({
-      path: "metadata/1.json",
-      content: JSON.stringify(collectible),
-    })
-
-    let cid;
-    for await (const result of ipfs.addAll(files)) {
-      if (result.path == "metadata") {
-        cid = result.cid;
-      }
-      console.log("IPFS upload:", result)
-    }
-    //const result = await ipfs.add(files); // addToIPFS(JSON.stringify(yourJSON))
-    const uri = "https://ipfs.io/ipfs/" + cid.toString() + "/{id}.json"
-    const args = buildArgs(values, uri);
-    console.log("Arguments:", args);
-    const remixArtifact = require("../contracts/Remix.json");
-    const deployer = new ethers.ContractFactory(remixArtifact.abi, remixArtifact.bytecode, props.signer)
-    const result = await deployer.deploy(...args);
-    console.log("Deploy results: ", result)
-    const registerResult = await props.writeContracts["RemixRegistry"].registerRemix(args[1], result.address)
-    console.log("Registered Contract: ", registerResult);
-    setIsDeploying(false);
-  }
-
   const onFinish = (values) => {
     setIsDeploying(true);
     console.log('Success:', values);
-    deploy(values);
-    // make jsons for nft and rmx
-    // set args
-    // deploy
+    const remix = new Remix(null, signer);
+    remix.signer = signer;
+    remix.authors = authors.map((author) => (author.address));
+    remix.authorsSplits = authors.map((author) => (author.split * 100))
+    remix.parents = parents.map((parent) => (parent.address))
+    remix.parentsSplits = parents.map((parent) => (parent.split * 100))
+    remix.RMXPrice = values.RMXprice
+    remix.RMXincrease = values.RMXincrease
+    remix.NFTprice = values.NFTprice
+    remix.maxRMXTime = 10000
+    remix.RMXMetadata = remixMetadata
+    remix.CollectibleMetadata = collectibleMetadata
+    remix.royalty = 1000
 
+    console.log("About to deploy:", remix, remix.deployArgs);
+    // Uploading Metadata
+    remix.uploadMetadata().then((hash, uri) => {
+      notification.info({
+        message: "Metadata uploaded! IPFS hash is: " + hash + " | URI is " + uri,
+        placement: "bottomRight",
+      });
+      // Deploying Remix contract
+      remix.deploy().then((contract) => {
+        notification.info({
+          message: "Remix contract deployed! Address is:" + contract.address,
+          placement: "bottomRight",
+        });
+        // Registering Remix contract
+        remix.registerContract(remixRegistry).then(() => {
+          notification.info({
+            message: "Contract is registered with this website!",
+            placement: "bottomRight",
+          });
+          setIsDeploying(false);
+        }).catch((error) => {
+          setIsDeploying(false);
+          console.log(error)
+          notification.error({
+            message: error.message,
+            placement: "bottomRight",
+          });
+        })
+      }).catch((error) => {
+        setIsDeploying(false);
+        console.log(error)
+        notification.error({
+          message: error.message,
+          placement: "bottomRight",
+        });
+      })
+    }).catch((error) => {
+      setIsDeploying(false);
+      console.log(error)
+      notification.error({
+        message: error.message,
+        placement: "bottomRight",
+      });
+    })
   };
 
   const onFinishFailed = (errorInfo) => {
@@ -279,16 +197,9 @@ export default function DeployRemix(props) {
           </Title>
           <List
             itemLayout="horizontal"
-            dataSource={Object.keys(myRemixes).map((address) => (myRemixes[address]))}
+            dataSource={remixContracts}
             renderItem={item => (
-              <List.Item key={item.id}>
-                <List.Item.Meta
-                  avatar={<Avatar src={item.RMX_metadata.image} />}
-                  title={item.RMX_metadata.name}
-                  description={item.RMX_metadata.description}
-                />
-                {isInParents(item.address) ? null : <Button type="primary" onClick={() => {item.split = 0; parents.push(item); updateParents(parents)}}>Use</Button>}
-              </List.Item>
+              <RemixListItem remix={item} CTA1={isInParents(item.address) ? null : <Button type="primary" onClick={() => {item.split = 0; parents.push(item); updateParents(parents)}}>Use</Button>} />
             )}
           />
         </Col>
@@ -301,17 +212,17 @@ export default function DeployRemix(props) {
               <Form.Item
                 label="Name"
                 name="collectibleName"
-                values={collectible.name}
+                values={collectibleMetadata.name}
                 rules={[{ required: true, message: 'Please give this artwork a name!' }]}
               >
-                <Input onChange={(e) => { const c = {...collectible}; c.name = e.target.value; setCollectible(c)}}/>
+                <Input onChange={(e) => { const c = {...collectibleMetadata}; c.name = e.target.value; setCollectibleMetadata(c)}}/>
               </Form.Item>
               <Form.Item
                 label="Description"
                 name="collectibleDescription"
                 rules={[{ required: true, message: 'Please describe this artwork!' }]}
               >
-                <TextArea rows={4} onChange={(e) => { const c = {...collectible}; c.description = e.target.value; setCollectible(c) }}/>
+                <TextArea rows={4} onChange={(e) => { const c = {...collectibleMetadata}; c.description = e.target.value; setCollectibleMetadata(c) }}/>
               </Form.Item>
             </Panel>
             <Panel forceRender={true} header="Remix" key="2">
@@ -320,14 +231,14 @@ export default function DeployRemix(props) {
                 name="remixName"
                 rules={[{ required: true, message: 'Please give this remix NFT a name!' }]}
               >
-                <Input onChange={(e) => { const r = {...remix}; r.name = e.target.value; setRemix(r) }}/>
+                <Input onChange={(e) => { const r = {...remixMetadata}; r.name = e.target.value; setRemixMetadata(r) }}/>
               </Form.Item>
               <Form.Item
                 label="Description"
                 name="remixDescription"
                 rules={[{ required: true, message: 'Please describe this remix NFT!' }]}
               >
-                <TextArea rows={4} onChange={(e) => { const r = {...remix}; r.description = e.target.value; setRemix(r) }}/>
+                <TextArea rows={4} onChange={(e) => { const r = {...remixMetadata}; r.description = e.target.value; setRemixMetadata(r) }}/>
               </Form.Item>
             </Panel>
             <Panel forceRender={true} header="Authors" key="3">
@@ -380,10 +291,10 @@ export default function DeployRemix(props) {
           </Title>
           <UploadRemixFiles
             name="UploadBox"
-            collectible={collectible}
-            setCollectible={setCollectible}
-            remix={remix} 
-            setRemix={setRemix}
+            collectible={collectibleMetadata}
+            setCollectible={setCollectibleMetadata}
+            remix={remixMetadata} 
+            setRemix={setRemixMetadata}
           />
         </Col>
       </Row>

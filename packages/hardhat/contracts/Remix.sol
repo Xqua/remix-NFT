@@ -60,6 +60,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     uint256[] public authorsSplits; /* List of authors splits */
     address[] public parents; /* List of authors splits */
     uint256[] public parentsSplits; /* List of authors splits */
+    address public currentRMXOwner;
 
     address[] public splitAddresses; /*Addresses to receive splits including parent contracts and authors*/
     mapping(address => uint256) public splits; /*Amount of splits to send*/
@@ -69,15 +70,15 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
 
     // Events
     event RMXPurchased(address holder, uint256 tokenId, uint256 amount);
-    event RMXCountdownStarted(address holder, uint256 expiration);
-    event CollectiblePurchased(address holder, uint256 tokenId, uint256 amount);
+    event RMXCountdownStarted(address buyer, uint256 expiration);
+    event CollectiblePurchased(address buyer, uint256 tokenId, uint256 amount);
     event RoyaltiesHarvested(address[] recipients, address tokenAddress, uint256[] amounts);
-    event DerivativeIssued(uint256 tokenId, address dst);
+    event DerivativeIssued(address dst);
     event Finalized(address[] authors, bool success); // todo better
     event BadgeIssued(uint256 tokenId, address dst);
     event RoyaltyReceived(uint256 amount);
     event ParentAdded(address parent);
-    event Mint(address to, uint256 tokenID);
+    event Mint(address dst, uint256 tokenID);
 
     /// @dev Construtor sets the token base URI, and external interfaces
     /// @param uri_ String to prepend to token IDs
@@ -131,7 +132,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
             splitAddresses.push(_parents[_j]); /*Add split address for each parent token*/
             splits[_parents[_j]] = _parentSplits[_j]; /*Add split amount for each parent token*/
             _splitSum += _parentSplits[_j]; /*Add splits to working sum*/
-            require(IRemix(_parents[_j]).requestDerivative(msg.sender)); /*Request derivatives from each specified parent*/
+            //require(IRemix(_parents[_j]).requestDerivative(msg.sender)); /*Request derivatives from each specified parent*/
         }
 
         require(_splitSum == 10000, "!split total"); /*Ensure valid split total*/
@@ -155,13 +156,15 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     }
 
     /// @dev Purchase remix token on perpetual auction
-    /// @param _currentOwner Address of current token owner
-    function purchaseRmx(address _currentOwner) public payable {
+    function purchaseRmx() public payable {
         require(msg.value >= minPurchasePrice, "Not enough"); /*Must send at least min purchase price*/
         require(
-            (balanceOf(_currentOwner, uint256(TokenTypes.RMX)) == 1),
-            "!owner"
-        ); /*Must specify valid current owner*/
+            (balanceOf(msg.sender, uint256(TokenTypes.RMX)) == 0),
+            "Buyer already owns the RMX"
+        ); 
+        require( (balanceOf(currentRMXOwner, uint256(TokenTypes.RMX)) == 1),
+            "Owner does not own the RMX token"
+        );
 
         minPurchasePrice =
             (minPurchasePrice * (10000 + increasePoints)) /
@@ -170,22 +173,22 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         if (hasBeenPurchased) {
             /*If token is being purchased first time keep ETH in contract and distribute via harvest*/
             uint256 _toSend = (msg.value * (10000 - royalties)) / 10000; /*Send amount to owner less royalties*/
-            (bool _success, ) = _currentOwner.call{value: _toSend}("");
+            (bool _success, ) = currentRMXOwner.call{value: _toSend}("");
             require(_success, "could not send"); // TODO WETH fallback?
         } else {
             hasBeenPurchased = true; /*Set purchased so we skip this next time*/
         }
 
         safeTransferFrom(
-            _currentOwner,
+            currentRMXOwner,
             msg.sender,
             uint256(TokenTypes.RMX),
             1,
             ""
         ); /*Send RMX token to new owner*/
 
-        canMintUntil[_currentOwner] = block.timestamp + countdownTime; /*Start countdown for previous owner*/
-
+        canMintUntil[currentRMXOwner] = block.timestamp + countdownTime; /*Start countdown for previous owner*/
+        currentRMXOwner = msg.sender;
         _mintBadge(msg.sender); /*Mint a badge to new owner*/
         emit RMXPurchased(msg.sender, uint256(TokenTypes.RMX), msg.value);
     }
@@ -216,6 +219,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         require(licenseActive(_minter), "!license"); /*TODO is this safe? Should require pre approval of minter?*/
         // TODO additional validations
         _mintDerivative(msg.sender);
+        emit DerivativeIssued(_minter)
         //_mint(msg.sender, uint256(TokenTypes.Derivative), 1, "");
     }
 
@@ -281,8 +285,8 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     /// @param _recipient Where to send badge
     function _mintRMX(address _recipient) internal {
         _mint(_recipient, uint256(TokenTypes.RMX), 1, "");
+        currentRMXOwner = _recipient;
         emit Mint(_recipient, uint256(TokenTypes.RMX));
-
     }
 
     /// @dev Mint Derivative - nontransferable

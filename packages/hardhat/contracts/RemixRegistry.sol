@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol"; //https://github.com/OpenZe
 
 contract RemixRegistry is Ownable {
 
-  event Mint(address[] authors, address remixContract);
+  event NewRemix(address[] authors, address contractAddress);
 
   mapping(address => address[]) registry; /*all Remix for this deployer*/
 
@@ -14,11 +14,11 @@ contract RemixRegistry is Ownable {
     // what should we do on deploy?
   }
 
-  function registerRemix(address[] calldata authors, address remixContract) public {
+  function registerRemix(address[] calldata authors, address contractAddress) public {
     for (uint i = 0; i < authors.length; i++) {
-      registry[authors[i]].push(remixContract);  
+      registry[authors[i]].push(contractAddress);  
     }
-    emit Mint(authors, remixContract);
+    emit NewRemix(authors, contractAddress);
   }
 
   function getRemixByAuthor(address author) public view returns(address[] memory) {

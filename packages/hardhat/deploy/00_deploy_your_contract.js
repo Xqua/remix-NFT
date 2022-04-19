@@ -48,7 +48,8 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   await registry.registerRemix(args[1], remix1.address);
 
   args[0] = tokenUri_2;
-  args[2][0] = 9000;
+  args[1].push("0xE8B791bF71366717D1B0bDe618CaD05d91448798")
+  args[2] = [4000, 5000];
   args[3].push(remix1.address)
   args[4].push(1000);
 

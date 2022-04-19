@@ -44,6 +44,7 @@ const noContractDisplay = (
 const isQueryable = fn => (fn.stateMutability === "view" || fn.stateMutability === "pure") && fn.inputs.length === 0;
 
 export default function Contract({
+  customAddress,
   customContract,
   account,
   gasPrice,
@@ -62,8 +63,8 @@ export default function Contract({
   } else {
     contract = customContract;
   }
-
-  const address = contract ? contract.address : "";
+  
+  const address = customAddress ? customAddress : contract.address;
   const contractIsDeployed = useContractExistsAtAddress(provider, address);
 
   const displayedContractFunctions = useMemo(
