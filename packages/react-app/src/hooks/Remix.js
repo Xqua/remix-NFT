@@ -33,4 +33,35 @@ const useRemix = (localProvider, readContracts, userSigner) => {
     return remixContracts;
 };
 
-export default useRemix;
+const useAddressRemixes = ( readContracts, address) => {
+    const [myContracts, setMyContracts] = useState([]);
+
+    const getContracts = async () => {
+        const contractAddresses = await readContracts["RemixRegistry"].getRemixByAuthor(address);
+        setMyContracts(contractAddresses);
+    }
+    
+    useEffect(() => {
+        if (readContracts && address) {
+            getContracts();
+            try {
+                readContracts["RemixRegistry"].on("NewRemix", (...events) => {
+                    const args = events[events.length - 1].args
+                    if (args.authors.includes(address)) {
+                        myContracts.push(args.contractAddress)
+                        setMyContracts(myContracts)
+                    }
+                });
+                return () => {
+                    readContracts["RemixRegistry"].removeListener("NewRemix");
+                };
+            } catch (e) {
+                console.log(e);
+            }
+        }
+    }, [readContracts, address]);
+
+    return myContracts;
+};
+
+export { useRemix, useAddressRemixes };

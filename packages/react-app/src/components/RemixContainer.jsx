@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext } from "react";
-import {Row, Col, Card, Collapse, Skeleton, Image, List, Button, Divider} from "antd";
+import {Row, Col, Card, Collapse, Skeleton, Image, List, Button, Space, Divider} from "antd";
 import { FileImageFilled, FileZipFilled, EditOutlined } from "@ant-design/icons";
 import Blockies from "react-blockies";
-import { RemixListItem, RemixActivity } from ".";
+import { RemixListItem, RemixActivity, BuyNFTButton, BuyRMXButton } from ".";
 import { RemixContext } from "../helpers"
 
 export default function RemixContainer(props) {
@@ -49,54 +49,75 @@ export default function RemixContainer(props) {
     const { Panel } = Collapse;
     const { Meta } = Card;
     return (
-        <Row >
-            <Col offset={2} span={9}>
+        <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
+            <Col className="gutter-row" span={12}>
                 <Card
-                    style={{ width: 500 }}
+                    style={{ width: "100%" }}
                     cover={
                         isLoading() ? 
-                            <Skeleton.Image loading={isLoading()} />
+                        <Skeleton.Image loading={isLoading()} />
                         :
                         <Image
-                            width={500}
-                            alt={metadata?.name}
-                            src={metadata?.image}
+                        width={"100%"}
+                        alt={metadata?.name}
+                        src={metadata?.image}
                         />
                     }
                     actions={[
                         <FileImageFilled key="Collectible" onClick={()=>{setShowCollectible(true)}}/>,
                         <FileZipFilled key="RMX" onClick={() => { setShowCollectible(false) }}/>,
                     ]}
-                >
+                    >
                     <Skeleton avatar active loading={metadata?.image == null}>
                         <Meta
                             avatar={<Blockies seed={remix.author != null ? remix.authors[0].toLowerCase() : "seed"} />}
                             title={metadata?.name}
                             description={metadata?.description}
-                        />
+                            />
                     </Skeleton>
                 </Card>
             </Col>
-            <Col offset={1} span={9}>
+            <Col className="gutter-row" span={12}>
                 <Collapse accordion>
                     <Panel header="About" key="about">
-                        
+                        <p>Authors: {remix.authors ? remix.authors.join(", ") : ""} </p>
+                        <p>{remix.isCollectibleAvailable ? 
+                            "Current Collectible NFT price: " + <b>remix.CollectiblePrice</b> + " Eth" :
+                            "The collectible NFT was bought for: " + <b>remix.CollectiblePrice</b> + " Eth"
+                        }</p>
+                        <p>The RMX token is available for: <b>{remix.RMXPrice}</b> Eth</p>
                     </Panel>
+                    {remix.canDerive ? 
+                        <Panel header="RAW Files" key="rawFiles">
+                            <p>Access to the remixable files</p>
+                            <Button type="primary" href={remix.RMXMetadata.files}>Download</Button>
+                        </Panel>
+                        :
+                        null
+                    }
                     <Panel header="Parent creations" key="parents">
                         <List
                             itemLayout="horizontal"
-                            dataSource={remix.parents ? remix.parents.map(address => (remixContext[address])) : []}
+                            dataSource={remixContext.remixContracts && remix.parents ? remix.parents.map(address => (remixContext.remixContracts[address])) : []}
                             renderItem={item => (
-                                <RemixListItem remix={item} CTA1={item.isCollectibleAvailable ? <Button type="primary">Buy NFT</Button> : null} CTA2={<Button type="primary">Buy RMX</Button>} />
+                                <RemixListItem 
+                                    remix={item} 
+                                    CTA1={<BuyNFTButton remix={item} type="primary" />} 
+                                    CTA2={<BuyRMXButton remix={item} type="primary" />} 
+                                />
                             )}
                         />
                     </Panel>
                     <Panel header="Children creations" key="children">
                         <List
                             itemLayout="horizontal"
-                            dataSource={remix? remix.children.map(address => (remixContext[address])) : []}
+                            dataSource={remixContext.remixContracts && remix.children ? remix.children.map(address => (remixContext.remixContracts[address])) : []}
                             renderItem={item => (
-                                <RemixListItem remix={item} CTA1={<Button type="primary">Buy NFT</Button>} CTA2={<Button type="primary">Buy RMX</Button>} />
+                                <RemixListItem 
+                                    remix={item} 
+                                    CTA1={<BuyNFTButton remix={item} type="primary" />} 
+                                    CTA2={<BuyRMXButton remix={item} type="primary" />} 
+                                />
                             )}
                         />
                     </Panel>
@@ -113,6 +134,11 @@ export default function RemixContainer(props) {
                         
                     </Panel>
                 </Collapse>
+                <Divider />
+                <Space>
+                    <BuyNFTButton remix={remix} type="primary" /> 
+                    <BuyRMXButton remix={remix} type="primary" />
+                </Space>
             </Col>
         </Row>
     )

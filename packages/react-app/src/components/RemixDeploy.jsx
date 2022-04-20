@@ -1,19 +1,19 @@
 import { notification, Spin, Typography, Collapse, Button, Form, Input, InputNumber, List, Avatar, Row, Col, Divider } from "antd";
 import React, {useState, useEffect } from "react";
 import { FileImageOutlined, SettingOutlined, EditOutlined, UserAddOutlined, UserDeleteOutlined, DeleteOutlined } from '@ant-design/icons';
-import { UploadRemixFiles, ParentSplitField, AddressField, RemixListItem } from "../components";
+import { UploadRemixFiles, ParentSplitField, AddressField, RemixListItem } from ".";
 import { Remix } from "../helpers";
 
 const { BufferList } = require('bl')
 const ipfsAPI = require('ipfs-http-client');
 const ipfs = ipfsAPI({ host: 'ipfs.infura.io', port: '5001', protocol: 'https' });
 
-const { ethers } = require("ethers");
+const { ethers, utils } = require("ethers");
 
 
 
 // @props.address: The address of the person logged in
-export default function DeployRemix(props) {
+export default function RemixDeploy(props) {
   const [remixContracts, setRemixContracts] = useState(props.remixContracts);
   const [remixRegistry, setRemixRegistry] = useState(props.remixRegistry)
   const [signer, setSigner] = useState(props.signer)
@@ -24,6 +24,7 @@ export default function DeployRemix(props) {
   const [parentsSplitFields, setParentsSplitFields] = useState([]);
   const [collectibleMetadata, setCollectibleMetadata] = useState({});
   const [remixMetadata, setRemixMetadata] = useState({});
+  const [address, setAddress] = useState(props.signer ? props.signer.address : "")
 
   const { Panel } = Collapse;
   const { Title } = Typography;
@@ -31,6 +32,7 @@ export default function DeployRemix(props) {
 
   useEffect(() => { setSigner(props.signer) }, [props.signer])
   useEffect(() => { setRemixRegistry(props.remixRegistry) }, [props.remixRegistry])
+  useEffect(() => { setAddress(props.signer ? props.signer.address : "")}, [props.signer])
 
   const updateAuthors = (authors) => {
     const newAuthors = authors.map((author, key) => {author.key = key; return author});
@@ -47,6 +49,7 @@ export default function DeployRemix(props) {
       <AddressField
         key={author.key}
         author={author}
+        splitRule={isSplitValid}
         onDelete={(author) => { authors.splice(author.key); updateAuthors(authors); }}
         onChange={(author) => { authors[author.key] = author; setAuthors(authors); }}
       />
@@ -60,6 +63,7 @@ export default function DeployRemix(props) {
     let newParentSplitFields = parents.map((parent) => (
       <ParentSplitField 
         parent={parent}
+        splitRule={isSplitValid}
         onDelete={(parent) => {parents.splice(parent.key); updateParents(parents)}}
         onChange={(parent) => {parents[parent.key] = parent; setParents(parents); }}
       />
@@ -111,6 +115,18 @@ export default function DeployRemix(props) {
     })
     return exists;
   }
+  
+  const isSplitValid = ({ getFieldValue }) => ({
+    validator(_, value) {
+      let sumSplit = 0;
+      authors.forEach((author) => { sumSplit += author.split })
+      parents.forEach((parent) => { sumSplit += parent.split })
+      if (sumSplit == 100) {
+        return Promise.resolve();
+      }
+      return Promise.reject(new Error('The total of splits is not 100%!'));
+    },
+  })
 
   const onFinish = (values) => {
     setIsDeploying(true);
@@ -189,6 +205,10 @@ export default function DeployRemix(props) {
         onFinishFailed={onFinishFailed}
         autoComplete="off"
         layout="vertical"
+        initialValues={{
+          "author0": address,
+          "authorSplit0": 100
+        }}
       >
       <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} justify="space-between">
         <Col className="gutter-row" span={8}>

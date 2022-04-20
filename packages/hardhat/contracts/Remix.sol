@@ -60,6 +60,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     uint256[] public authorsSplits; /* List of authors splits */
     address[] public parents; /* List of authors splits */
     uint256[] public parentsSplits; /* List of authors splits */
+    address public currentCollectibleOwner;
     address public currentRMXOwner;
 
     address[] public splitAddresses; /*Addresses to receive splits including parent contracts and authors*/
@@ -132,7 +133,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
             splitAddresses.push(_parents[_j]); /*Add split address for each parent token*/
             splits[_parents[_j]] = _parentSplits[_j]; /*Add split amount for each parent token*/
             _splitSum += _parentSplits[_j]; /*Add splits to working sum*/
-            //require(IRemix(_parents[_j]).requestDerivative(msg.sender)); /*Request derivatives from each specified parent*/
+            require(IRemix(_parents[_j]).requestDerivative(msg.sender)); /*Request derivatives from each specified parent*/
         }
 
         require(_splitSum == 10000, "!split total"); /*Ensure valid split total*/
@@ -198,6 +199,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         require(totalSupply(uint256(TokenTypes.Collectible)) == 0, "Collectible already Puchased/Minted"); /*Only allow 1 to be minted TODO parameter?*/
         require(msg.value >= collectiblePrice, "The price is bellow the value set!"); /*Must send at least the min value*/
         _mintCollectible(msg.sender);
+        currentCollectibleOwner = msg.sender;
         // _mint(msg.sender, uint256(TokenTypes.Collectible), 1, ""); /*Mint collectible to buyer*/
         emit CollectiblePurchased(msg.sender, uint256(TokenTypes.Collectible), msg.value);
     }
@@ -214,12 +216,13 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
 
     /// @dev Request derivative by a child token contract
     /// @param _minter Address of user whose badge to use
-    function requestDerivative(address _minter) external {
+    function requestDerivative(address _minter) external returns(bool) {
         // TODO: maybe add a check that the contract calling is a RMX contract?
         require(licenseActive(_minter), "!license"); /*TODO is this safe? Should require pre approval of minter?*/
         // TODO additional validations
         _mintDerivative(msg.sender);
-        emit DerivativeIssued(_minter)
+        emit DerivativeIssued(msg.sender);
+        return true;
         //_mint(msg.sender, uint256(TokenTypes.Derivative), 1, "");
     }
 
@@ -349,6 +352,9 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
                     ids[_i] == uint256(TokenTypes.Collectible),
                 "!transferable"
             );
+            if (ids[_i] == uint256(TokenTypes.Collectible)) {
+                currentCollectibleOwner = to;
+            }
         }
     }
 }

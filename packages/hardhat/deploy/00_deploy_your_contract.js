@@ -3,6 +3,8 @@ const ipfsAPI = require('ipfs-http-client');
 const { globSource } = require('ipfs-http-client')
 const ipfs = ipfsAPI({host: 'ipfs.infura.io', port: '5001', protocol: 'https' })
 
+const { utils } = require("ethers");
+
 module.exports = async ({ getNamedAccounts, deployments }) => {
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
@@ -29,9 +31,9 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     [10000],// uint256[] memory _authorSplits,
     [], // address[] memory _parents,
     [], // uint256[] memory _parentSplits,
-    1000, // uint256 _startingPrice,
-    1000, // uint256 _increasePoints,
-    10000, // uint256 _collectiblePrice,
+    utils.parseEther("0.01"), // uint256 _startingPrice,
+    utils.parseEther("0.01"), // uint256 _increasePoints,
+    utils.parseEther("0.1"), // uint256 _collectiblePrice,
     10000, // uint256 _rmxCountdown,
     100] // uint256 _royalties
 

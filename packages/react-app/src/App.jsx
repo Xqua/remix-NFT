@@ -1,14 +1,11 @@
 import WalletConnectProvider from "@walletconnect/web3-provider";
-import { Alert, Button, Card, Col, Input, List, Menu, Row } from "antd";
+import { Alert, Button, Col, Menu, Row, Layout } from "antd";
 import "antd/dist/antd.css";
-import { getAddress } from "ethers/lib/utils";
-import React, { useCallback, useEffect, useState, useContext } from "react";
-import ReactJson from "react-json-view";
+import React, { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Link, Route, Switch } from "react-router-dom";
 import Web3Modal from "web3modal";
 import "./App.css";
-import { Account, Address, AddressInput, Contract, Faucet, GasGauge, Header, Ramp, ThemeSwitch, DeployRemix, RemixCard } from "./components";
-import RemixContainer from "./components/RemixContainer";
+import { Account, Contract, Faucet, GasGauge, Header, Ramp, ThemeSwitch, RemixDeploy, RemixContainer, RemixCardList } from "./components";
 import {INFURA_ID, NETWORK, NETWORKS } from "./constants";
 import { Transactor } from "./helpers";
 import {
@@ -20,9 +17,12 @@ import {
   useGasPrice,
   useOnBlock,
   useUserSigner,
-  useRemix
+  useRemix,
+  useAddressRemixes,
 } from "./hooks";
 import { RemixContext } from "./helpers";
+
+const { Content } = Layout;
 
 const { BufferList } = require("bl");
 // https://www.npmjs.com/package/ipfs-http-client
@@ -129,7 +129,7 @@ function App(props) {
   const [injectedProvider, setInjectedProvider] = useState();
   const [address, setAddress] = useState();
   const [selectedContract, setSelectedContract] = useState();
-  const [remixContext, setRemixContext] = useState();
+  const [remixContext, setRemixContext] = useState({});
 
 
 
@@ -199,32 +199,17 @@ function App(props) {
   //const numberCollectiblesCount = collectiblesCount && collectiblesCount.toNumber && collectiblesCount.toNumber();
   
   const remixContracts = useRemix(localProvider, readContracts, userSigner)
+  const myRemixContracts = useAddressRemixes(readContracts, address)
+
   useEffect(() => {
-    setRemixContext(remixContracts)
+    remixContext.remixContracts = remixContracts
+    setRemixContext(remixContext)
   }, [remixContracts])
 
-  const GetRemix = (address) => {
-    return useRemix(address)
-  }
-
-  // useEffect(() => {
-  //   const updateRMX = async () => {
-  //     console.log("new Mint Events!")
-  //     if (selectedChainId && address) {
-  //       let remixArtifact = require("./contracts/Remix.json");
-  //       setRemixContracts(remixArtifact);
-  //       for (let i = 0; i < mintEvents.length; i++) {
-  //         let mintEvent = mintEvents[i];
-  //         if (!remixContracts[mintEvent.remixContract]) {
-  //           remixContracts[mintEvent.remixContract] = GetRemix(mintEvent.remixContract);
-  //         } 
-  //       }
-  //       setRemixContracts({ ...remixContract });
-  //     }
-  //   }
-  //   console.log("Starting await updateRMX");
-  //   updateRMX(); 
-  // }, [address, mintEvents, selectedChainId])
+  useEffect(() => {
+    remixContext.selectedContract = selectedContract;
+    setRemixContext(remixContext)
+  }, [selectedContract])
 
   //
   // 🧫 DEBUG 👨🏻‍🔬
@@ -407,9 +392,19 @@ function App(props) {
               }}
               to="/"
             >
-              Remixes
+              Explore
             </Link>
           </Menu.Item>
+            <Menu.Item key="/mine">
+              <Link
+                onClick={() => {
+                  setRoute("/mine");
+                }}
+                to="/mine"
+              >
+                My Remixes
+              </Link>
+            </Menu.Item>
           <Menu.Item key="/mint">
             <Link
               onClick={() => {
@@ -442,57 +437,47 @@ function App(props) {
           </Menu.Item>
         </Menu>
 
-        <Switch>
-          <Route exact path="/">
-            {/*
-                🎛 this scaffolding is full of commonly used components
-                this <Contract/> component will automatically parse your ABI
-                and give you a form to interact with it locally
-            */}
-            <div style={{ width: 1200, margin: "auto", marginTop: 32, paddingBottom: 32 }}>
-              <List
-                grid={{ gutter: 20, column: 4 }}
-                dataSource={Object.keys(remixContracts).map((address) => (remixContracts[address]))}
-                renderItem={item => {
-                  const id = item.id;
-                  return (
-                    <List.Item key={id}>
-                      <RemixCard 
-                        remix={item} 
-                        onDebug={(address) => { 
-                          setSelectedContract(address); 
-                          setRoute("/debugcontracts");
-                          }}/>
-                    </List.Item>
-                  );
-                }}
+        <Content style={{ margin: 'auto', maxWidth: 1200}}>
+          <Switch>
+            <Route exact path="/">
+              <RemixCardList
+                  remixContracts={remixContracts}
+                  setSelectedContract={setSelectedContract}
+                  setRoute={setRoute}
+                />
+            </Route>
+              <Route exact path="/mine">
+                <RemixCardList
+                  remixContracts={myRemixContracts.map(contract => remixContracts[contract])}
+                  setSelectedContract={setSelectedContract}
+                  setRoute={setRoute}
+                />
+              </Route>
+            <Route path="/mint">
+              <RemixDeploy
+                address={address}
+                remixContracts={Object.keys(remixContracts).map((remix) => (remixContracts[remix])).filter((remix) => remix.canDerive)}
+                remixRegistry={writeContracts ? writeContracts["RemixRegistry"] : null}
+                signer={userSigner}
               />
-            </div>
-          </Route>
-          <Route path="/mint">
-            <DeployRemix
-              address={address}
-              remixContracts={Object.keys(remixContracts).map((remix) => (remixContracts[remix])).filter((remix) => remix.canDerive)}
-              remixRegistry={writeContracts ? writeContracts["RemixRegistry"] : null}
-              signer={userSigner}
-            />
-          </Route>
-          <Route path="/debugcontracts">
-            <Contract
-              customAddress={selectedContract}
-              name="Remix"
-              signer={userSigner}
-              provider={localProvider}
-              address={address}
-              blockExplorer={blockExplorer}
-            />
-          </Route>
-          <Route path="/one" >
-            {selectedContract ? 
-              <RemixContainer remix={remixContracts[selectedContract]} />
-            : null}
-          </Route>
-        </Switch>
+            </Route>
+            <Route path="/debugcontracts">
+              <Contract
+                customAddress={selectedContract}
+                name="Remix"
+                signer={userSigner}
+                provider={localProvider}
+                address={address}
+                blockExplorer={blockExplorer}
+              />
+            </Route>
+            <Route path="/one" >
+              {selectedContract ? 
+                <RemixContainer remix={remixContracts[selectedContract]} />
+              : null}
+            </Route>
+          </Switch>
+        </Content>
       </BrowserRouter>
 
       <ThemeSwitch />

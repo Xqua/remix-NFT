@@ -20,7 +20,7 @@ export default function ParentSplitField(props) {
                     label="Split"
                     name={"parent_" + parent.address}
                     values={split}
-                    rules={[{ required: true, message: 'Please give a split amount to this author!' }]}
+                    rules={[{ required: true, message: 'Please give a split amount to this author!' }, props.splitRule]}
                 >
                     <InputNumber onChange={setSplit} />
                 </Form.Item>

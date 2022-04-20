@@ -1,16 +1,15 @@
 import React, {useState, useEffect } from "react";
 import { useHistory } from "react-router-dom";
-import { Divider, Card, Row, Col, Statistic, Image, Skeleton } from 'antd';
+import { Divider, Card, Row, Col, Statistic, Image, Skeleton, Modal, Space } from 'antd';
 import { DollarOutlined, ShareAltOutlined, FileImageOutlined, EditOutlined } from '@ant-design/icons';
 import Blockies from "react-blockies";
-import {
-    useContractLoader,
-} from "../hooks";
-
+import { BuyNFTButton, BuyRMXButton, RemixContainer } from "."
 
 export default function RemixCard(props) {
     const [remix, setRemix] = useState(props.remix ? props.remix : {});
     let history = useHistory();
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isBuyModalVisible, setIsBuyModalVisible] = useState(false);
     
     //const writeContract = useContractLoader(props.signer, { chainId: props.localChainId, customAddresses: { "Remix": remix.address } }); 
 
@@ -38,8 +37,8 @@ export default function RemixCard(props) {
                 />
             }
             actions={[
-                <FileImageOutlined key="Collectible"/>,
-                <DollarOutlined key="RMX" />,
+                <FileImageOutlined key="Show" onClick={() => setIsModalVisible(true)}/>,
+                <DollarOutlined key="Buy" onClick={() => setIsBuyModalVisible(true)}/>,
                 <EditOutlined key="edit" onClick={() => { if (remix.address) {props.onDebug(remix.address); history.push("/debugcontracts")}}} />
             ]}
         >   
@@ -59,6 +58,32 @@ export default function RemixCard(props) {
                     {remix?.RMXPrice == null ? <Skeleton.Button active /> : <Statistic title="Remix ($)" value={remix?.RMXPrice} />}
                 </Col>
             </Row>
+            <Modal
+                title={remix?.CollectibleMetadata?.name}
+                visible={isModalVisible}
+                onOk={() => setIsModalVisible(false)}
+                onCancel={() => setIsModalVisible(false)}
+                width={"90%"}
+            >
+                <RemixContainer remix={remix} />
+            </Modal>
+            <Modal 
+                title="Buy this Remix" 
+                visible={isBuyModalVisible}
+                onOk={() => setIsBuyModalVisible(false)}
+                onCancel={() => setIsBuyModalVisible(false)}
+            >
+                <Row justify="space-between">
+                    <Col span={12}>
+                        {remix?.CollectiblePrice == null ? <Skeleton.Button active /> : <Statistic title="Collectible ($)" value={remix?.CollectiblePrice} />}
+                        <BuyNFTButton remix={remix} onClick={() => setIsBuyModalVisible(false)} />
+                    </Col>
+                    <Col span={12}>
+                        {remix?.RMXPrice == null ? <Skeleton.Button active /> : <Statistic title="Remix ($)" value={remix?.RMXPrice} />}
+                        <BuyRMXButton remix={remix} onClick={() => setIsBuyModalVisible(false)} />
+                    </Col>
+                </Row>
+            </Modal>
         </Card>
     )
 }

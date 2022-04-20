@@ -5,7 +5,7 @@ const { BufferList } = require("bl");
 const ipfsAPI = require("ipfs-http-client");
 export const ipfs = ipfsAPI({ host: "ipfs.infura.io", port: "5001", protocol: "https" });
 
-const { ethers } = require("ethers");
+const { ethers, utils } = require("ethers");
 
 const getFromIPFS = async hashToGet => {
     for await (const file of ipfs.get(hashToGet)) {
@@ -50,8 +50,11 @@ export class Remix {
         this.state = 0;
         this.address = address;
         this.signer = signer;
+        this.currency = "ETH"
         this.artifcat = require("../contracts/Remix.json");
         this.events = {}
+        this.authors = []
+        this.isAuthor = false;
         if (address) {
             if (signer) {
                 this.contract = new ethers.Contract(this.address, this.artifcat.abi, signer);
@@ -77,15 +80,16 @@ export class Remix {
             this.authorsSplits,
             this.parents,
             this.parentsSplits,
-            this.RMXPrice,
-            this.RMXincrease,
-            this.NFTprice,
+            utils.parseEther(this.RMXPrice.toString()),
+            utils.parseEther(this.RMXincrease.toString()),
+            utils.parseEther(this.NFTprice.toString()),
             this.maxRMXTime,
             this.royalty
         ];
     }
 
     get isCollectibleAvailable() {
+        console.log("Collectible Events:", this.events.CollectiblePurchased)
         if (this.events.CollectiblePurchased) {
             return this.events.CollectiblePurchased.length == 0;
         } 
@@ -122,6 +126,22 @@ export class Remix {
         return activity;
     }
 
+    async purchaseCollectible(price) {
+        let overrides = {
+            value: utils.parseEther(price.toString())     // ether in this case MUST be a string
+        };
+        const result = await this.contract.purchaseCollectible(overrides)
+        return result;
+    }
+
+    async purchaseRMX(price) {
+        let overrides = {
+            value: utils.parseEther(price.toString())     // ether in this case MUST be a string
+        };
+        const result = await this.contract.purchaseRmx(overrides)
+        return result;
+    }
+
     getTokenName(tokenID) {
         switch (tokenID) {
             case 0:
@@ -156,6 +176,9 @@ export class Remix {
         this.contract.getAuthors().then((data) => {
             this.authors = data[0];
             this.authorsSplits = data[1];
+            if (this.signer) {
+                this.authors.forEach((author) => { if (author == this.signer.address) this.isAuthor = true; })
+            }
             this.state++;
         });
         this.contract.getParents().then((data) => {
@@ -175,11 +198,11 @@ export class Remix {
             this.state++;
         }
         this.contract.collectiblePrice().then((data) => {
-            this.CollectiblePrice = parseInt(data._hex, 16);
+            this.CollectiblePrice = parseFloat(utils.formatEther(data));
             this.state++;
         });
         this.contract.minPurchasePrice().then((data) => {
-            this.RMXPrice = parseInt(data._hex, 16);
+            this.RMXPrice = parseFloat(utils.formatEther(data));
             this.state++;
         });
         this.contract.uri(0).then((data) => {
@@ -194,6 +217,10 @@ export class Remix {
                 this.state++;
             });
         });
+        this.contract.currentCollectibleOwner().then((data) => {
+            this.currentCollectibleOwner = data;
+            this.state++;
+        })
     }
 
     get isValid() {
