@@ -326,7 +326,18 @@ const addressZero = "0x0000000000000000000000000000000000000000";
         expect(licence == true, "Owner of RMX does not have the licence!")
       })
     })
+
+    describe("Flag", function () {
+      it("Should flag", async () => {
+        throw Error("Not yet implemented!")
+      })
+
+      it("Should unflag", async () => {
+        throw Error("Not yet implemented!")
+      })
+    })
   })
+
 
   describe("RemixRegistry", function () {
     let RemixRegistryFactory, RemixFactory, registry;
