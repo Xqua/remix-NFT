@@ -3,6 +3,7 @@ pragma solidity >=0.8.0;
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
+import "hardhat/console.sol";
 
 interface IRemix {
     function requestDerivative(address) external returns (bool);
@@ -157,7 +158,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     }
 
     /// @dev Purchase remix token on perpetual auction
-    function purchaseRmx() public payable {
+    function purchaseRMX() public payable {
         require(msg.value >= minPurchasePrice, "Not enough"); /*Must send at least min purchase price*/
         require(
             (balanceOf(msg.sender, uint256(TokenTypes.RMX)) == 0),
@@ -179,6 +180,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         } else {
             hasBeenPurchased = true; /*Set purchased so we skip this next time*/
         }
+
 
         safeTransferFrom(
             currentRMXOwner,
@@ -240,6 +242,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         override
         returns (address receiver, uint256 royaltyAmount)
     {
+        require(_tokenId == uint256(TokenTypes.Collectible), "Asking for royalties for a non purchasable token");
         return (address(this), (_salePrice * royalties) / 10000);
     }
 
@@ -342,7 +345,8 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         uint256[] memory amounts,
         bytes memory data
     ) internal override(ERC1155Supply) {
-        super._beforeTokenTransfer(operator, from, to, ids, amounts, data); /*Trigger parent hook to track supplies*/
+        bool isRMX = false;
+        bool isOther = false;
         for (uint256 _i = 0; _i < ids.length; _i++) {
             require(
                 to == address(0) ||
@@ -355,6 +359,15 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
             if (ids[_i] == uint256(TokenTypes.Collectible)) {
                 currentCollectibleOwner = to;
             }
+            if (ids[_i] == uint256(TokenTypes.RMX)) {
+                isRMX = true;
+            } else {
+                isOther = true;
+            }
+        }
+        require(!(isRMX && isOther), "Cannot transfer Both the RMX and other tokens in the samme call");
+        if (!isRMX) {
+            super._beforeTokenTransfer(operator, from, to, ids, amounts, data); /*Trigger parent hook to track supplies*/
         }
     }
 }

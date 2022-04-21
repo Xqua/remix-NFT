@@ -16,6 +16,8 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   const tokenUri_2 = "https://ipfs.io/ipfs/" + file.cid.toString() + "/RMX_2_{id}.json"
   const tokenUri_3 = "https://ipfs.io/ipfs/" + file.cid.toString() + "/RMX_3_{id}.json"
 
+  console.log(tokenUri_1);
+
   await deploy("RemixRegistry", {
     // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
     from: deployer,
