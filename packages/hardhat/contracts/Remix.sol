@@ -1,12 +1,13 @@
 pragma solidity >=0.8.0;
 
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "hardhat/console.sol";
 
 interface IRemix {
-    function requestDerivative(address) external returns (bool);
+    function requestDerivative(address[] memory, address) external returns (bool);
 }
 
 ///
@@ -32,11 +33,19 @@ interface IERC2981 is IERC165 {
         returns (address receiver, uint256 royaltyAmount);
 }
 
-contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
+contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
     using SafeERC20 for IERC20;
 
+    bool finalized = false;
+    /**
+     * @dev Throws if called by any account other than the owner.
+     */
+    modifier isFinalized() {
+        require(finalized, "The contract has not been finalized!");
+        _;
+    }
+    
     enum TokenTypes {
-        RMX,
         Collectible,
         Derivative,
         Badge
@@ -62,6 +71,8 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     address[] public parents; /* List of authors splits */
     uint256[] public parentsSplits; /* List of authors splits */
     address public currentCollectibleOwner;
+
+    // This field is essentialy an artificial representation of a token 
     address public currentRMXOwner;
 
     address[] public splitAddresses; /*Addresses to receive splits including parent contracts and authors*/
@@ -71,9 +82,9 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
 
     // Events
-    event RMXPurchased(address holder, uint256 tokenId, uint256 amount);
     event RMXCountdownStarted(address buyer, uint256 expiration);
-    event CollectiblePurchased(address buyer, uint256 tokenId, uint256 amount);
+    event RMXPurchased(address holder, uint256 amount);
+    event CollectiblePurchased(address buyer, uint256 amount);
     event RoyaltiesHarvested(address[] recipients, address tokenAddress, uint256[] amounts);
     event DerivativeIssued(address dst);
     event Finalized(address[] authors, bool success); // todo better
@@ -81,6 +92,8 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     event RoyaltyReceived(uint256 amount);
     event ParentAdded(address parent);
     event Mint(address dst, uint256 tokenID);
+
+    constructor(string memory uri_) ERC1155(uri_) {}
 
     /// @dev Construtor sets the token base URI, and external interfaces
     /// @param uri_ String to prepend to token IDs
@@ -93,7 +106,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     /// @param _collectiblePrice Initial price of collectible token
     /// @param _rmxCountdown How long holder has to create deriviative work after losing RMX token
     /// @param _royalties Base royalties for perpetual auction and secondary market
-    constructor(
+    function initialize(
         string memory uri_,
         address[] memory _authors,
         uint256[] memory _authorSplits,
@@ -104,11 +117,12 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         uint256 _collectiblePrice,
         uint256 _rmxCountdown,
         uint256 _royalties
-    ) ERC1155(uri_) {
+    ) public {
         require(_authors.length > 0, "There must be at least one author");
         require(_authors.length == _authorSplits.length, "!length"); /*Check input constraint*/
         require(_parents.length == _parentSplits.length, "!length"); /*Check input constraint*/
 
+        _setURI(uri_);
         authors = _authors;
         authorsSplits = _authorSplits;
         parents = _parents;
@@ -134,7 +148,7 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
             splitAddresses.push(_parents[_j]); /*Add split address for each parent token*/
             splits[_parents[_j]] = _parentSplits[_j]; /*Add split amount for each parent token*/
             _splitSum += _parentSplits[_j]; /*Add splits to working sum*/
-            require(IRemix(_parents[_j]).requestDerivative(msg.sender)); /*Request derivatives from each specified parent*/
+            require(IRemix(_parents[_j]).requestDerivative(_authors, address(this))); /*Request derivatives from each specified parent*/
         }
 
         require(_splitSum == 10000, "!split total"); /*Ensure valid split total*/
@@ -147,26 +161,23 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         increasePoints = _increasePoints; /*Set the amount to increase*/
         
         if (senderIsAuthor) {
-            _mintRMX(msg.sender);
+            currentRMXOwner = msg.sender;
         } else {
-            _mintRMX(_authors[0]);
+            currentRMXOwner = _authors[0];
         }
-        //_mint(msg.sender, uint256(TokenTypes.RMX), 1, ""); /*Mint RMX token to deployer*/
 
         _registerInterface(_INTERFACE_ID_ERC2981);
+        finalized = true;
         emit Finalized(_authors, true);
     }
 
     /// @dev Purchase remix token on perpetual auction
-    function purchaseRMX() public payable {
+    function purchaseRMX() public payable isFinalized {
         require(msg.value >= minPurchasePrice, "Not enough"); /*Must send at least min purchase price*/
         require(
-            (balanceOf(msg.sender, uint256(TokenTypes.RMX)) == 0),
+            (msg.sender != currentRMXOwner),
             "Buyer already owns the RMX"
         ); 
-        require( (balanceOf(currentRMXOwner, uint256(TokenTypes.RMX)) == 1),
-            "Owner does not own the RMX token"
-        );
 
         minPurchasePrice =
             (minPurchasePrice * (10000 + increasePoints)) /
@@ -181,34 +192,25 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
             hasBeenPurchased = true; /*Set purchased so we skip this next time*/
         }
 
-
-        safeTransferFrom(
-            currentRMXOwner,
-            msg.sender,
-            uint256(TokenTypes.RMX),
-            1,
-            ""
-        ); /*Send RMX token to new owner*/
-
         canMintUntil[currentRMXOwner] = block.timestamp + countdownTime; /*Start countdown for previous owner*/
         currentRMXOwner = msg.sender;
         _mintBadge(msg.sender); /*Mint a badge to new owner*/
-        emit RMXPurchased(msg.sender, uint256(TokenTypes.RMX), msg.value);
+        emit RMXPurchased(msg.sender, msg.value);
     }
 
     /// @dev Purchase collectible token from initial creator
-    function purchaseCollectible() external payable {
+    function purchaseCollectible() external payable isFinalized {
         require(totalSupply(uint256(TokenTypes.Collectible)) == 0, "Collectible already Puchased/Minted"); /*Only allow 1 to be minted TODO parameter?*/
         require(msg.value >= collectiblePrice, "The price is bellow the value set!"); /*Must send at least the min value*/
         _mintCollectible(msg.sender);
         currentCollectibleOwner = msg.sender;
         // _mint(msg.sender, uint256(TokenTypes.Collectible), 1, ""); /*Mint collectible to buyer*/
-        emit CollectiblePurchased(msg.sender, uint256(TokenTypes.Collectible), msg.value);
+        emit CollectiblePurchased(msg.sender, msg.value);
     }
 
     /// @dev Harvest royalties and perform one generation of splits
     /// @param _token 0 address if ETH, non-0 address if ERC20
-    function harvestRoyalties(address _token) public {
+    function harvestRoyalties(address _token) public isFinalized {
         if (_token == address(0)) {
             _performSplit(address(this).balance); /*Harvest ETH*/
         } else {
@@ -217,13 +219,20 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     }
 
     /// @dev Request derivative by a child token contract
-    /// @param _minter Address of user whose badge to use
-    function requestDerivative(address _minter) external returns(bool) {
+    /// @param _authors Address of authors to check for validity of holding a RMX
+    /// @param _dst Address of the Remix contract to send the derivative token to
+    function requestDerivative(address[] memory _authors, address _dst) external isFinalized returns(bool) {
         // TODO: maybe add a check that the contract calling is a RMX contract?
-        require(licenseActive(_minter), "!license"); /*TODO is this safe? Should require pre approval of minter?*/
+        bool hasLicense = false;
+        for (uint256 _i = 0; _i < _authors.length; _i++) {
+            if (licenseActive(_authors[_i])) {
+                hasLicense = true;
+            }
+        }
+        require(hasLicense, "!license"); /*TODO is this safe? Should require pre approval of minter?*/
         // TODO additional validations
-        _mintDerivative(msg.sender);
-        emit DerivativeIssued(msg.sender);
+        _mintDerivative(_dst);
+        emit DerivativeIssued(_dst);
         return true;
         //_mint(msg.sender, uint256(TokenTypes.Derivative), 1, "");
     }
@@ -246,12 +255,20 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         return (address(this), (_salePrice * royalties) / 10000);
     }
 
-    function getAuthors() public view returns (address[] memory, uint256[] memory) {
+    function getAuthorsAndSplits() public view returns (address[] memory, uint256[] memory) {
         return (authors, authorsSplits);
     }
 
-    function getParents() public view returns (address[] memory, uint256[] memory) {
+    function getAuthors() public view returns (address[] memory) {
+        return authors;
+    }
+
+    function getParentsAndSplits() public view returns (address[] memory, uint256[] memory) {
         return (parents, parentsSplits);
+    }
+
+    function getParents() public view returns (address[] memory) {
+        return parents;
     }
 
     function licenseActive(address _holder) public view returns (bool) {
@@ -265,13 +282,13 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         return
             (isAuthor) ||
             (canMintUntil[_holder] > block.timestamp) ||
-            (balanceOf(_holder, uint256(TokenTypes.RMX)) == 1);
+            (currentRMXOwner == _holder);
     }
 
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC165Storage, IERC165, ERC1155)
+        override(ERC165Storage, IERC165, ERC1155, ERC1155Receiver)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
@@ -285,14 +302,6 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
     function _mintBadge(address _recipient) internal {
         _mint(_recipient, uint256(TokenTypes.Badge), 1, "");
         emit Mint(_recipient, uint256(TokenTypes.Badge));
-    }
-
-    /// @dev Mint RMX - nontransferable
-    /// @param _recipient Where to send badge
-    function _mintRMX(address _recipient) internal {
-        _mint(_recipient, uint256(TokenTypes.RMX), 1, "");
-        currentRMXOwner = _recipient;
-        emit Mint(_recipient, uint256(TokenTypes.RMX));
     }
 
     /// @dev Mint Derivative - nontransferable
@@ -345,13 +354,11 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
         uint256[] memory amounts,
         bytes memory data
     ) internal override(ERC1155Supply) {
-        bool isRMX = false;
-        bool isOther = false;
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data); /*Trigger parent hook to track supplies*/
         for (uint256 _i = 0; _i < ids.length; _i++) {
             require(
                 to == address(0) ||
                     from == address(0) ||
-                    ids[_i] == uint256(TokenTypes.RMX) ||
                     ids[_i] == uint256(TokenTypes.Badge) ||
                     ids[_i] == uint256(TokenTypes.Collectible),
                 "!transferable"
@@ -359,15 +366,6 @@ contract Remix is ERC1155Supply, IERC2981, ERC165Storage {
             if (ids[_i] == uint256(TokenTypes.Collectible)) {
                 currentCollectibleOwner = to;
             }
-            if (ids[_i] == uint256(TokenTypes.RMX)) {
-                isRMX = true;
-            } else {
-                isOther = true;
-            }
-        }
-        require(!(isRMX && isOther), "Cannot transfer Both the RMX and other tokens in the samme call");
-        if (!isRMX) {
-            super._beforeTokenTransfer(operator, from, to, ids, amounts, data); /*Trigger parent hook to track supplies*/
         }
     }
 }

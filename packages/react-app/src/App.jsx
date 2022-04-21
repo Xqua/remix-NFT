@@ -20,7 +20,7 @@ import {
   useRemix,
   useAddressRemixes,
 } from "./hooks";
-import { RemixContext } from "./helpers";
+import { RemixContext, RemixFactory } from "./helpers";
 
 const { Content } = Layout;
 
@@ -192,8 +192,8 @@ function App(props) {
       "0x34aA3F359A9D614239015126635CE7732c18fDF3",
     ]);
 
-  // 📟 Listen for broadcast events
-  const mintEvents = useEventListener(readContracts, "RemixRegistry", "NewRemix", localProvider, 1);
+  // // 📟 Listen for broadcast events
+  // const mintEvents = useEventListener(readContracts, "RemixFactory", "RemixDeployed", localProvider, 1);
   
   //let collectiblesCount = useContractReader(readContracts, "YourCollectible", "getCurrentTokenID");
   //const numberCollectiblesCount = collectiblesCount && collectiblesCount.toNumber && collectiblesCount.toNumber();
@@ -225,7 +225,6 @@ function App(props) {
       readContracts &&
       writeContracts &&
       mainnetContracts &&
-      mintEvents && 
       remixContracts
     ) {
       console.log("_____________________________________ 🏗 scaffold-eth _____________________________________");
@@ -251,7 +250,6 @@ function App(props) {
     readContracts,
     writeContracts,
     mainnetContracts,
-    mintEvents,
     remixContracts
   ]);
 
@@ -457,7 +455,7 @@ function App(props) {
               <RemixDeploy
                 address={address}
                 remixContracts={Object.keys(remixContracts).map((remix) => (remixContracts[remix])).filter((remix) => remix.canDerive)}
-                remixRegistry={writeContracts ? writeContracts["RemixRegistry"] : null}
+                remixFactory={writeContracts ? writeContracts["RemixFactory"] : null}
                 signer={userSigner}
               />
             </Route>

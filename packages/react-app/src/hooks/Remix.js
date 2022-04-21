@@ -13,39 +13,45 @@ const { ethers } = require("ethers");
 
 const DEBUG = true;
 
-const useRemix = (localProvider, readContracts, userSigner) => {
-    const [remixContracts, setRemixContracts] = useState({});
+const useRemix = (remixFactory, userSigner) => {
+    const [remixContracts, setRemixContracts] = useState(remixFactory.remixContracts);
     let lastIndex = 0;
 
-    const newRemixEvents = useEventListener(readContracts, "RemixRegistry", "NewRemix", localProvider, 1);
-
-    useEffect(() => { 
-        newRemixEvents.slice(lastIndex).forEach((event) => {
-            if (!remixContracts[event.contractAddress]) {
-                remixContracts[event.contractAddress] = new Remix(event.contractAddress, userSigner)
+    useEffect(() => {
+        if (remixFactory && address) {
+            try {
+                remixFactory.contract.on("RemixDeployed", (...events) => {
+                    const args = events[events.length - 1].args
+                    if (!remixContracts[args.contractAddress]) {
+                        remixContracts[args.contractAddress] = new Remix(args.contractAddress, userSigner)
+                    }
+                    setRemixContracts(remixContracts);
+                });
+                return () => {
+                    remixFactory.contract.removeListener("RemixDeployed");
+                };
+            } catch (e) {
+                console.log(e);
             }
-            lastIndex++;
-        })
-        setRemixContracts({...remixContracts});
-    }, 
-        [newRemixEvents]);
+        }
+    }, [remixFactory, address]);
 
     return remixContracts;
 };
 
-const useAddressRemixes = ( readContracts, address) => {
+const useAddressRemixes = ( remixFactory, address) => {
     const [myContracts, setMyContracts] = useState([]);
 
     const getContracts = async () => {
-        const contractAddresses = await readContracts["RemixRegistry"].getRemixByAuthor(address);
+        const contractAddresses = await remixFactory.getRemixByAuthor(address);
         setMyContracts(contractAddresses);
     }
     
     useEffect(() => {
-        if (readContracts && address) {
+        if (remixFactory && address) {
             getContracts();
             try {
-                readContracts["RemixRegistry"].on("NewRemix", (...events) => {
+                remixFactory.contract.on("RemixDeployed", (...events) => {
                     const args = events[events.length - 1].args
                     if (args.authors.includes(address)) {
                         myContracts.push(args.contractAddress)
@@ -53,13 +59,13 @@ const useAddressRemixes = ( readContracts, address) => {
                     }
                 });
                 return () => {
-                    readContracts["RemixRegistry"].removeListener("NewRemix");
+                    remixFactory.contract.removeListener("RemixDeployed");
                 };
             } catch (e) {
                 console.log(e);
             }
         }
-    }, [readContracts, address]);
+    }, [remixFactory, address]);
 
     return myContracts;
 };

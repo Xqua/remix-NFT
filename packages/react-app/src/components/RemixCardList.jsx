@@ -4,23 +4,10 @@ import { Route } from "react-router-dom";
 import { RemixCard } from ".";
 
 export default function RemixCardList(props) {
-  const [remixContracts, setRemixContracts] = useState(props.remixContracts);
-
-  useEffect(() => {
-    if (props.showOnlyMyContracts) {
-      const myRemix = Object.keys(remixContracts)
-        .map((remix) => (remixContracts[remix]))
-        .filter((remix) => (remix.isAuthor)) 
-      setRemixContracts(myRemix)
-    } else {
-      setRemixContracts(props.remixContracts)
-    }
-  }, [props.remixContracts])
-
   return (
     <List
       grid={{ gutter: 20, column: 4 }}
-      dataSource={Object.keys(remixContracts).map((address) => (remixContracts[address]))}
+      dataSource={Object.keys(props.remixContracts).map((address) => (props.remixContracts[address]))}
       renderItem={item => {
         const id = item.id;
         return (

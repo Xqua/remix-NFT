@@ -34,12 +34,18 @@ const buildArgs = (authors, parents = []) => {
 
 const addressZero = "0x0000000000000000000000000000000000000000";
   
-  describe("Remix-NFT", function () {
-    let RemixFactory;
-    let Remix1, Remix2, Remix3;
-    let args;
-    let events;
-    let owner, addr1, addr2, addrs;
+describe("Remix-NFT", function () {
+  let RemixFactory;
+  let Remix1, Remix2, Remix3;
+  let args;
+  let events;
+  let owner, addr1, addr2, addrs;
+  
+  const deployRemix = async (args) => {
+    const contract = await RemixFactory.deploy("")
+    contract.initialize(...args);
+    return contract;
+  }
   //const [owner, addr1, addr2] = await ethers.getSigners();
 
   describe("Remix", function () {
@@ -54,90 +60,105 @@ const addressZero = "0x0000000000000000000000000000000000000000";
     it("Should deploy Remix with no parents", async function () {
       args = buildArgs([owner.address])
 
-      Remix1 = await RemixFactory.deploy(...args); 
+      Remix1 = await deployRemix(args); 
     })
 
     it("Should deploy Remix with multiple authors", async function () {
       args = buildArgs([owner.address, addr1.address])
 
-      Remix1 = await RemixFactory.deploy(...args);
+      Remix1 = await deployRemix(args);
     })
 
     it("Should have the correct arguments", async function () {
       args = buildArgs([])
-
-      await expect(RemixFactory.deploy(...args))
+      let contract = await RemixFactory.deploy("")
+      await expect(contract.initialize(...args))
         .to.be.revertedWith('There must be at least one author');
 
       args = buildArgs([owner.address])
       args[2] = [2000, 2000]
 
-      await expect(RemixFactory.deploy(...args))
+      contract = await RemixFactory.deploy("")
+      await expect(contract.initialize(...args))
         .to.be.revertedWith('!length');
 
       args = buildArgs([owner.address], [owner.address])
       args[4] = []
 
-      await expect(RemixFactory.deploy(...args))
+      contract = await RemixFactory.deploy("")
+      await expect(contract.initialize(...args))
         .to.be.revertedWith('!length');
 
       args = buildArgs([owner.address], [owner.address])
 
-      await expect(RemixFactory.deploy(...args))
+      contract = await RemixFactory.deploy("")
+      await expect(contract.initialize(...args))
         .to.be.reverted;
 
       args = buildArgs([owner.address])
       args[2] = [2000]
 
-      await expect(RemixFactory.deploy(...args))
+      contract = await RemixFactory.deploy("")
+      await expect(contract.initialize(...args))
         .to.be.revertedWith("!split total");
       
       args = buildArgs([owner.address])
       args[9] = 20000
 
-      await expect(RemixFactory.deploy(...args))
+      contract = await RemixFactory.deploy("")
+      await expect(contract.initialize(...args))
         .to.be.revertedWith("max royalties exceeded");
     }) 
 
     it("Should deploy a Remix with parents", async function () {
       args = buildArgs([owner.address])
 
-      Remix1 = await RemixFactory.deploy(...args); 
+      Remix1 = await deployRemix(args); 
+      
+      args = buildArgs([owner.address], [Remix1.address])
+      
+      console.log("owner: ", owner.address, "Remix1: ", Remix1.address)
+      Remix2 = await deployRemix(args); 
 
-      args = buildArgs([owner.address], [Remix1.address], 1)
-
-      Remix2 = await RemixFactory.deploy(...args); 
-
-      const parent = await Remix2.parents(0);
-      expect(parent == Remix2.address, "Contract did not save the parents")
+      const parents = await Remix2.getParents();
+      expect(parents == [Remix1.address], "Contract did not save the parents")
       events = await Remix1.queryFilter("DerivativeIssued")
       expect(events.length == 1, "DerivativeIssue events missing")
     })
 
-    it("Should emit the correct events", async function () {
+    it("Should emit the correct events on initialize", async function () {
       const args = buildArgs([owner.address])
 
-      Remix1 = await RemixFactory.deploy(...args); 
+      Remix1 = await deployRemix(args); 
 
       events = await Remix1.queryFilter("Finalized")
       expect(events.length == 1, "Finalized event number is not correct")
-
-      events = await Remix1.queryFilter("Mint")
-      expect(events.length == 2, "Mint event number is not correct")
-      expect(events[0].args.tokenID == 3, "First mint is not badge")
-      expect(events[1].args.tokenID == 0, "Second mint is not RMX")
     })
 
     it("Should require the RMX token", async () => {
       args = buildArgs([owner.address])
 
-      Remix1 = await RemixFactory.deploy(...args); 
+      Remix1 = await deployRemix(args); 
 
       args = buildArgs([addr1.address], [Remix1.address])
 
-      await expect(RemixFactory.deploy(...args))
+      let contract = await RemixFactory.connect(addr1).deploy("")
+      await expect(contract.connect(addr1).initialize(...args))
         .to.be.revertedWith("!license") 
+
+      contract = await RemixFactory.connect(addr1).deploy("")
+      await expect(contract.connect(owner).initialize(...args))
+        .to.be.revertedWith("!license") 
+
+      overrides = { value: utils.parseEther("0.01") }
+
+      await Remix1.connect(addr1).purchaseRMX(overrides)
+
+      contract = await RemixFactory.connect(addr1).deploy("")
+      await contract.connect(owner).initialize(...args)
     })
+
+
 
     describe("purchaseRmx()", function () {
       beforeEach( async function () {
@@ -149,7 +170,7 @@ const addressZero = "0x0000000000000000000000000000000000000000";
       it("Should purchase the RMX", async function () {
         args = buildArgs([owner.address])
 
-        Remix1 = await RemixFactory.deploy(...args); 
+        Remix1 = await deployRemix(args); 
         overrides = { value: utils.parseEther("0.01")}
 
         await Remix1.connect(addr1).purchaseRMX(overrides)
@@ -160,15 +181,18 @@ const addressZero = "0x0000000000000000000000000000000000000000";
       beforeEach(async function () {
         args = buildArgs([owner.address])
 
-        Remix1 = await RemixFactory.deploy(...args);
+        Remix1 = await deployRemix(args);
       })
 
       it("Should purchase the Collectible", async function () {
         overrides = { value: utils.parseEther("0.1") }
 
-        await Remix1.connect(addr1).purchaseCollectible(overrides)
+        await expect(Remix1.connect(addr1).purchaseCollectible(overrides))
+          .to.emit(Remix1, "CollectiblePurchased")
+          .withArgs(addr1.address, utils.parseEther("0.1"))
+
         events = await Remix1.queryFilter("Mint")
-        expect(events[2].args.tokenID == 1, "Collectible mint event not sent")
+        expect(events.pop().args.tokenID == 1, "Collectible mint event not sent")
 
         expect(Remix1.balanceOf(owner.address, 1) == 0, "Owner still has collectible!")
         expect(Remix1.balanceOf(addr1.address, 1) == 1, "Collectible was not sent!")
@@ -186,13 +210,13 @@ const addressZero = "0x0000000000000000000000000000000000000000";
       beforeEach(async () => {
         args = buildArgs([owner.address])
 
-        Remix1 = await RemixFactory.deploy(...args);
+        Remix1 = await deployRemix(args);
 
         args = buildArgs([owner.address], [Remix1.address])
-        Remix2 = await RemixFactory.deploy(...args);
+        Remix2 = await deployRemix(args);
 
         args = buildArgs([owner.address, addr1.address], [Remix1.address, Remix2.address])
-        Remix3 = await RemixFactory.deploy(...args);
+        Remix3 = await deployRemix(args);
 
         overrides = { value: utils.parseEther("0.2") }
         await Remix1.connect(addr2).purchaseCollectible(overrides)
@@ -255,12 +279,12 @@ const addressZero = "0x0000000000000000000000000000000000000000";
       beforeEach(async () => {
         args = buildArgs([owner.address])
 
-        Remix1 = await RemixFactory.deploy(...args);
+        Remix1 = await deployRemix(args);
       })
 
       it("Should give the correct royalty info", async () => {
         value = utils.parseEther("1");
-        const royaltyInfo = await Remix1.royaltyInfo(1, value)
+        const royaltyInfo = await Remix1.royaltyInfo(0, value)
         expect(royaltyInfo.receiver == Remix1.address, "Receiver address is not correct")
         expect(royaltyInfo.royaltyAmount == utils.parseEther("0.1"), "Royalties amount is not correct")
 
@@ -268,7 +292,7 @@ const addressZero = "0x0000000000000000000000000000000000000000";
 
       it("Should throw a wrong token ID if not collectible", async () => {
         value = utils.parseEther("0.1");
-        await expect(Remix1.royaltyInfo(0, value))
+        await expect(Remix1.royaltyInfo(1, value))
           .to.revertedWith("Asking for royalties for a non purchasable token")
       })
     })
@@ -277,7 +301,7 @@ const addressZero = "0x0000000000000000000000000000000000000000";
       beforeEach(async () => {
         args = buildArgs([owner.address, addr1.address])
 
-        Remix1 = await RemixFactory.deploy(...args);
+        Remix1 = await deployRemix(args);
       })
 
       it("Should give the correct authors string", async () => {
@@ -290,10 +314,10 @@ const addressZero = "0x0000000000000000000000000000000000000000";
       beforeEach(async () => {
         args = buildArgs([owner.address])
 
-        Remix1 = await RemixFactory.deploy(...args);
+        Remix1 = await deployRemix(args);
 
         args = buildArgs([owner.address], [Remix1.address])
-        Remix2 = await RemixFactory.deploy(...args);
+        Remix2 = await deployRemix(args);
       })
 
       it("Should give the correct authors string", async () => {
@@ -306,7 +330,7 @@ const addressZero = "0x0000000000000000000000000000000000000000";
       beforeEach(async () => {
         args = buildArgs([owner.address])
 
-        Remix1 = await RemixFactory.deploy(...args);
+        Remix1 = await deployRemix(args);
       })
 
       it("Should be a valid licence is this is the author", async () => {
@@ -339,48 +363,41 @@ const addressZero = "0x0000000000000000000000000000000000000000";
   })
 
 
-  describe("RemixRegistry", function () {
-    let RemixRegistryFactory, RemixFactory, registry;
+  describe("RemixFactory", function () {
+    let RemixFactoryFactory, RemixFactory, remixFactory;
 
     beforeEach(async () => {
-      RemixRegistryFactory = await ethers.getContractFactory("RemixRegistry");
+      RemixFactoryFactory = await ethers.getContractFactory("RemixFactory");
       RemixFactory = await ethers.getContractFactory("Remix");
     })
 
-    it("Should deploy YourContract", async function () {
-      registry = await RemixRegistryFactory.deploy();
+    it("Should deploy the Remix Factory proxy contract", async function () {
+      remixFactory = await RemixFactoryFactory.deploy();
     });
 
-    describe("registerRemix()", function () {
+    describe("deploy()", function () {
       beforeEach(async () => {
-        registry = await RemixRegistryFactory.deploy();
-
+        remixFactory = await RemixFactoryFactory.deploy();
       })
 
-      it("Should be able to register a remix", async function () {
+      it("Should be able to deploy a remix", async function () {
         args = buildArgs([owner.address])
-        const Remix = await RemixFactory.deploy(...args)
-        await expect(registry.registerRemix([owner.address], Remix.address))
-          .to.emit(registry, 'NewRemix')
-          .withArgs([owner.address], Remix.address);
+        await expect(remixFactory.deploy(...args))
+          .to.emit(remixFactory, 'RemixDeployed')
       });
-
-      it("Should return the contracts list for an author", async function () {
-
-      })
     });
 
     describe("getRemixByAuthor()", function () {
       beforeEach(async () => {
-        registry = await RemixRegistryFactory.deploy();
+        remixFactory = await RemixFactoryFactory.deploy();
       })
 
       it("Should return the contracts list for an author", async function () {
         args = buildArgs([owner.address])
-        const Remix = await RemixFactory.deploy(...args)
-        await registry.registerRemix([owner.address], Remix.address)
-        const authors = await registry.getRemixByAuthor(owner.address)
-        expect(authors == [Remix.address])
+        const remix1 = await remixFactory.deploy(...args)
+        const remix2 = await remixFactory.deploy(...args)
+        const authors = await remixFactory.getRemixByAuthor(owner.address)
+        expect(authors == [remix1.address, remix2.address])
       });
     });
 

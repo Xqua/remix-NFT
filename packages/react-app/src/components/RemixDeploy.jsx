@@ -15,7 +15,7 @@ const { ethers, utils } = require("ethers");
 // @props.address: The address of the person logged in
 export default function RemixDeploy(props) {
   const [remixContracts, setRemixContracts] = useState(props.remixContracts);
-  const [remixRegistry, setRemixRegistry] = useState(props.remixRegistry)
+  const [remixFactory, setRemixFactory] = useState(props.remixFactory)
   const [signer, setSigner] = useState(props.signer)
   const [isDeploying, setIsDeploying] = useState();
   const [parents, setParents] = useState([]);
@@ -31,7 +31,7 @@ export default function RemixDeploy(props) {
   const { TextArea } = Input;
 
   useEffect(() => { setSigner(props.signer) }, [props.signer])
-  useEffect(() => { setRemixRegistry(props.remixRegistry) }, [props.remixRegistry])
+  useEffect(() => { setRemixFactory(props.remixFactory) }, [props.remixFactory])
   useEffect(() => { setAddress(props.signer ? props.signer.address : "")}, [props.signer])
 
   const updateAuthors = (authors) => {
@@ -159,7 +159,7 @@ export default function RemixDeploy(props) {
           placement: "bottomRight",
         });
         // Registering Remix contract
-        remix.registerContract(remixRegistry).then(() => {
+        remix.registerContract(remixFactory).then(() => {
           notification.info({
             message: "Contract is registered with this website!",
             placement: "bottomRight",

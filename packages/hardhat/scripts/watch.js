@@ -3,7 +3,7 @@ const { exec } = require("child_process");
 
 const run = () => {
   console.log("🛠  Compiling & Deploying...");
-  exec("yarn deploy && cp artifacts/contracts/Remix.sol/Remix.json ../react-app/src/contracts/", function (error, stdout, stderr) {
+  exec("yarn deploy && node scripts/copyArtifacts.js", function (error, stdout, stderr) {
     console.log(stdout);
     if (error) console.log(error);
     if (stderr) console.log(stderr);

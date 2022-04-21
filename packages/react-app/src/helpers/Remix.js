@@ -51,15 +51,15 @@ export class Remix {
         this.address = address;
         this.signer = signer;
         this.currency = "ETH"
-        this.artifcat = require("../contracts/Remix.json");
+        this.artifact = require("../contracts/Remix.json");
         this.events = {}
         this.authors = []
         this.isAuthor = false;
         if (address) {
             if (signer) {
-                this.contract = new ethers.Contract(this.address, this.artifcat.abi, signer);
+                this.contract = new ethers.Contract(this.address, this.artifact.abi, signer);
             } else {
-                this.contract = new ethers.Contract(this.address, this.artifcat.abi);
+                this.contract = new ethers.Contract(this.address, this.artifact.abi);
             }
             this.loadData();
             this.loadEvents();
@@ -173,7 +173,7 @@ export class Remix {
     }
 
     loadData() {
-        this.contract.getAuthors().then((data) => {
+        this.contract.getAuthorsAndSplits().then((data) => {
             this.authors = data[0];
             this.authorsSplits = data[1];
             if (this.signer) {
@@ -181,7 +181,7 @@ export class Remix {
             }
             this.state++;
         });
-        this.contract.getParents().then((data) => {
+        this.contract.getParentsAndSplits().then((data) => {
             this.parents = data[0];
             this.parentsSplits = data[1];
             this.state++;
@@ -276,25 +276,54 @@ export class Remix {
         //     throw "Not all fields have been set!";
         if (!this.signer)
             throw "Signer has not been defined!";
-        const factory = new ethers.ContractFactory(this.artifcat.abi, this.artifcat.bytecode, this.signer);
-        const result = await factory.deploy(...this.deployArgs);
-        if (!result.address)
+        const factory = new ethers.ContractFactory(this.artifact.abi, this.artifact.bytecode, this.signer);
+        const contract = await factory.deploy();
+        if (!contract.address)
             throw "There was an unknown error and the address of the contract is not avaiable";
-        this.address = result.address;
-        this.contract = new ethers.Contract(this.address, this.artifcat.abi, this.signer);
+        await contract.initialize(...this.deployArgs);
+        this.address = contract.address;
+        this.contract = new ethers.Contract(this.address, this.artifact.abi, this.signer);
         return this.contract;
-    }
-
-    async registerContract(registryContract) {
-        if (!registryContract)
-            throw "No contract passed";
-        if (!this.address)
-            throw "The contract address is not set";
-        if (!this.signer)
-            throw "No signer set!";
-        const registerResult = await registryContract.registerRemix(this.authors, this.address);
-        return registerResult;
     }
 }
 
-export default Remix;
+class RemixFactory {
+    constructor(address, signer) {
+        if (!address) throw new Error("Please set the address of the RemixFactory!")
+        this.address = address;
+        this.signer = signer;
+        this.artifact = require("../contracts/RemixFactory.json");
+        this.remixContracts = {}
+        if (address) {
+            if (signer) {
+                this.contract = new ethers.Contract(this.address, this.artifact.abi, signer);
+            } else {
+                this.contract = new ethers.Contract(this.address, this.artifact.abi);
+            }
+            this.loadRemixes();
+        }
+    }
+
+    async getRemixByAuthor(author) {
+        return this.contract.getRemixByAuthor(author)
+    }
+
+    loadRemixes() {
+        this.contract.queryFilter("RemixDeployed").then((data) => {
+            this.events["RemixDeployed"] = data.map((item) => {
+                this.remixContracts[item.args.contractAddress] = new Remix(item.args.contractAddress, this.signer)
+            })
+            this.state++
+        })
+    }
+
+    deploy(remix) {
+        if (!this.signer) throw new Error("Signer is not set!");
+        const contract = await factory.deploy(...this.deployArgs);
+        if (!contract.address)
+            throw "There was an unknown error and the address of the contract is not avaiable";
+        return new Remix(contract.address, this.signer);
+    }
+}
+
+export default { Remix, RemixFactory };
