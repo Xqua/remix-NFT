@@ -58,7 +58,6 @@ export default function RemixDeploy(props) {
       />
       )
     )
-    console.log("addressFields:", newAddressFields);
     setAddressFields(newAddressFields)
   }
 
@@ -74,7 +73,6 @@ export default function RemixDeploy(props) {
   }
  
   useEffect(() => {
-    console.log("Address is ", props.address);
     if (props.address) {
       authors.push({
         address: props.address,
@@ -112,7 +110,6 @@ export default function RemixDeploy(props) {
     let sumSplit = 0;
     authors.forEach((author) => { sumSplit += author.split })
     parents.forEach((parent) => { sumSplit += parent.split })
-    console.log("Updated sum:", sumSplit)
     setSplitSum(sumSplit);
     return sumSplit;
   }
@@ -121,7 +118,6 @@ export default function RemixDeploy(props) {
   const isSplitValid = ({ getFieldValue }) => ({
     validator(_, value) {
       const sumsplit = updateSplitSum();
-      console.log("Split sum is: ", sumsplit)
       if (sumsplit == 100) {
         return Promise.resolve();
       }
@@ -131,7 +127,6 @@ export default function RemixDeploy(props) {
 
   const onFinish = (values) => {
     setIsDeploying(true);
-    console.log('Success:', values);
     const remix = new Remix(null, signer);
     remix.signer = signer;
     remix.authors = authors.map((author) => (author.address));
@@ -146,7 +141,6 @@ export default function RemixDeploy(props) {
     remix.CollectibleMetadata = collectibleMetadata
     remix.royalty = 1000
 
-    console.log("Uploading Metadata")
     // Uploading Metadata
     remix.uploadMetadata().then((hash, uri) => {
       notification.info({
@@ -154,7 +148,6 @@ export default function RemixDeploy(props) {
         placement: "bottomRight",
       });
       // Deploying Remix contract
-      console.log("About to deploy with Factory:", remixFactory);
       remixFactory.deploy(remix).then((contract) => {
         notification.info({
           message: "Remix contract deployed! Address is:" + contract.address,

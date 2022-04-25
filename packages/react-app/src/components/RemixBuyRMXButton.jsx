@@ -13,7 +13,7 @@ export default function BuyRMXButton(props) {
     const { Meta } = Card;
 
     const onBuyRMX = (values) => {
-        console.log("Buy NFT", values);
+        //console.log("Buy NFT", values);
         setIsLoading(true)
         props.remix.purchaseRMX(values.price).then((result) => {
             notification.info({ message:"Congratulation, you just bought this collectible NFT!", placement: "bottomRight"})

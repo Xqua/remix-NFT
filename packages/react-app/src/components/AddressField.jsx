@@ -4,8 +4,6 @@ import { AddressInput } from ".";
 import { UserDeleteOutlined } from "@ant-design/icons";
 
 export default function AddressField(props) {
-    console.log("From AddressField:", props.author);
-
     return (
         <Row justify="space-between" align="middle">
             <Col span={12}>

@@ -201,7 +201,7 @@ function App(props) {
   useEffect(() => {
     if (writeContracts && writeContracts["RemixFactory"] && userSigner) {
       const factory = new RemixFactory(writeContracts["RemixFactory"].address, userSigner)
-      console.log("->>>>>>FACTORY", factory)
+      //console.log("->>>>>>FACTORY", factory)
       setRemixFactory(factory)
     } 
   }, [writeContracts, userSigner])

@@ -19,13 +19,13 @@ export default function RemixActivity(props) {
             if (activity.event == "TransferBatch") return <Timeline.Item key={key} dot={<RightCircleOutlined />}> <p>Batch transfert issued</p></Timeline.Item>
             if (activity.event == "TransferSingle") return <Timeline.Item key={key} dot={<RightCircleOutlined />}> <p>Transfert of token {remix.getTokenName(parseInt(activity.args.id._hex, 16))}</p> <p>from: {activity.args.from}</p> <p>to: {activity.args.to}</p></Timeline.Item>
         });
-        console.log("Updating Timeline Activity", newTimelineItems);
+        //console.log("Updating Timeline Activity", newTimelineItems);
         setTimelineItems(newTimelineItems);
     }
 
     useEffect(() => {
         setRemix(props.remix)
-        console.log("Remix updated!", props.remix.activity)
+        //console.log("Remix updated!", props.remix.activity)
         updateTimeline()
     }, [props.remix])
 

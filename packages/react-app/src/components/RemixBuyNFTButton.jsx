@@ -19,7 +19,7 @@ export default function BuyNFTButton(props) {
     // }, [props.remix, props.remix.state])
 
     const onBuyNFT = (values) => {
-        console.log("Buy NFT", values);
+        //console.log("Buy NFT", values);
         setIsLoading(true);
         props.remix.purchaseCollectible(values.price).then((result) => {
             notification.info({ message:"Congratulation, you just bought this collectible NFT!", placement: "bottomRight"})

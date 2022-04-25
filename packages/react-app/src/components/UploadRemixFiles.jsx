@@ -17,19 +17,6 @@ export default function UploadRemixFiles(props) {
     const { Meta } = Card;
     const { Dragger } = Upload;
 
-    const getFromIPFS = async hashToGet => {
-        for await (const file of ipfs.get(hashToGet)) {
-            console.log(file.path)
-            if (!file.content) continue;
-            const content = new BufferList()
-            for await (const chunk of file.content) {
-                content.append(chunk)
-            }
-            console.log(content)
-            return content
-        }
-    }
-
     const addToIPFS = async (fileInfo, fileToUpload) => {
         const { onSuccess, onError, file, onProgress } = fileInfo;
 
@@ -51,8 +38,6 @@ export default function UploadRemixFiles(props) {
                 r.files = "https://ipfs.io/ipfs/" + result.path;
                 props.setRemix(r);
             }
-            console.log("Collectible:", props.collectible)
-            console.log("Remix:", props.remix)
             onSuccess("Ok!");
         } else {
             onError({ error: "File could not be uploaded to IPFS" })
@@ -106,8 +91,6 @@ export default function UploadRemixFiles(props) {
                                 multiple={false}
                                 maxCount={1}
                                 customRequest={uploadToIPFS}
-                                onChange={(event) => { console.log("File Changed:", event) }}
-                                onDrop={(event) => { console.log("File Dropped:", event) }}
                             >
                                 {isUploading ?
                                     <>
@@ -153,8 +136,6 @@ export default function UploadRemixFiles(props) {
                                         name="remixMedia"
                                         multiple={false}
                                         customRequest={uploadToIPFS}
-                                        onChange={(event) => { console.log("File Changed:", event) }}
-                                        onDrop={(event) => { console.log("File Dropped:", event) }}
                                     >
                                         {isUploading ?
                                             <>
@@ -186,8 +167,6 @@ export default function UploadRemixFiles(props) {
                                     name="remixFiles"
                                     multiple={false}
                                     customRequest={uploadToIPFS}
-                                    onChange={(event) => { console.log("File Changed:", event) }}
-                                    onDrop={(event) => { console.log("File Dropped:", event) }}
                                 >
                                     {isUploading ?
                                         <>

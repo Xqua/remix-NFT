@@ -209,7 +209,6 @@ export class Remix {
     startRMXPurchaseListener() {
         try {
             this.contract.on("RMXPurchased", (...events) => {
-                console.log("New RMXPurchased Event!")
                 const args = events[events.length - 1].args
                 this.contract.minPurchasePrice().then((data) => {
                     this.RMXPrice = parseFloat(utils.formatEther(data));
@@ -227,7 +226,6 @@ export class Remix {
     startCollectiblePurchaseListener() {
         try {
             this.contract.on("CollectiblePurchased", (...events) => {
-                console.log("New CollectiblePurchased Event!")
                 const args = events[events.length - 1].args
                 this.contract.collectiblePrice().then((data) => {
                     this.CollectiblePrice = parseFloat(utils.formatEther(data));
@@ -245,7 +243,6 @@ export class Remix {
     startRoyalitiesListener() {
         try {
             this.contract.on("RoyaltiesHarvested", (...events) => {
-                console.log("New RoyaltiesHarvested Event!")
                 const args = events[events.length - 1].args
                 this.state++;
             });
@@ -258,7 +255,6 @@ export class Remix {
 
         try {
             this.contract.on("RoyaltyReceived", (...events) => {
-                console.log("New RoyaltyReceived Event!")
                 const args = events[events.length - 1].args
                 this.state++;
             });
@@ -366,7 +362,6 @@ export class Remix {
     }
 
     async uploadMetadata() {
-        console.log("About to upload metadata:", this.RMXMetadata, this.CollectibleMetadata)
         let files = [];
         if (!this.RMXMetadata)
             throw new Error("Remix Metadata are not set!")
@@ -445,7 +440,6 @@ export class RemixFactory {
     startListener() {
         try {
             this.contract.on("RemixDeployed", (...events) => {
-                console.log("New RemixDeployed Event!")
                 const args = events[events.length - 1].args
                 if (!this.remixContracts[args.contractAddress]) {
                     this.remixContracts[args.contractAddress] = new Remix(args.contractAddress, this.signer)
@@ -469,9 +463,7 @@ export class RemixFactory {
 
     async deploy(remix) {
         let contractsBefore = await this.getRemixByAuthor(remix.authors[0])
-        console.log("Deploying with Remix:", remix)
         if (!this.signer) throw new Error("Signer is not set!");
-        console.log("About to deploy with: ", remix.deployArgs)
         const tx = await this.contract.deploy(...remix.deployArgs);
         let contractsAfter = await this.getRemixByAuthor(remix.authors[0])
 
