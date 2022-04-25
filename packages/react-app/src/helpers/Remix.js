@@ -7,6 +7,7 @@ export const ipfs = ipfsAPI({ host: "ipfs.infura.io", port: "5001", protocol: "h
 
 const { ethers, utils } = require("ethers");
 
+
 const getFromIPFS = async hashToGet => {
     for await (const file of ipfs.get(hashToGet)) {
         if (!file.content) continue;
@@ -28,6 +29,13 @@ const readJSONFromIPFS = async (uri) => {
         console.log("Error reading JSON from IPFS", e);
         return {};
     }
+}
+
+const getERC20Info = async (address, blockchain = "ethereum") => {
+    const url = `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${blockchain}/assets/${address}/info.json`
+    const info = JSON.parse(await fetch(url));
+    info.logo = `https://github.com/trustwallet/assets/raw/master/blockchains/${blockchain}/assets/${address}/logo.png`
+    return info
 }
 
 /*
@@ -54,6 +62,7 @@ export class Remix {
         this.artifact = require("../contracts/Remix.json");
         this.events = {}
         this.authors = []
+        this.parents = []
         this.isAuthor = false;
         if (address) {
             if (signer) {
@@ -65,6 +74,8 @@ export class Remix {
             this.loadEvents();
         }
     }
+
+    
 
     get children() {
         if (this.events.DerivativeIssued) {
@@ -89,18 +100,24 @@ export class Remix {
     }
 
     get isCollectibleAvailable() {
-        console.log("Collectible Events:", this.events.CollectiblePurchased)
-        if (this.events.CollectiblePurchased) {
-            return this.events.CollectiblePurchased.length == 0;
-        } 
-        return false;
+        if (!this.currentCollectibleOwner) return null
+        if (this.currentCollectibleOwner != "0x0000000000000000000000000000000000000000") return false;
+        return true;
     }
 
     get priceHistory() {
+        let prices = []
         if (this.events.CollectiblePurchased) {
-            return this.events.CollectiblePurchased.map((data) => (data.amount))
+            this.events.CollectiblePurchased.forEach((data) => {
+                prices.push({token:"Collectible", price: utils.formatEther(data.args.amount)})
+            })
         }
-        return [];
+        if (this.events.RMXPurchased) {
+            this.events.RMXPurchased.forEach((data) => {
+                prices.push({ token: "RMX", price: utils.formatEther(data.args.amount) })
+            })
+        }
+        return prices;
     }
 
     get activity() {
@@ -126,11 +143,38 @@ export class Remix {
         return activity;
     }
 
+    async valueHeld() {
+        const result = await this.contract.getRoyalties();
+        const values = []
+        for (let i = 0; i < result[0].length; i++) {
+            let tokenName, logo, value;
+            if (result[0][i] == "0x0000000000000000000000000000000000000000") {
+                tokenName = "Eth"
+                logo = "https://upload.wikimedia.org/wikipedia/commons/0/05/Ethereum_logo_2014.svg"
+                value = parseFloat(utils.formatEther(result[1][i]))
+            } else {
+                const info = await getERC20Info(result[0][i]);
+                tokenName = info.name;
+                logo = info.logo;
+                value = parseFloat(utils.formatUnits(result[1][i], info.decimals))
+            }
+            values.push({
+                token: tokenName,
+                logo: logo,
+                value: value,
+                address: result[0][i]
+            })
+        }
+        return values
+    }
+
     async purchaseCollectible(price) {
         let overrides = {
             value: utils.parseEther(price.toString())     // ether in this case MUST be a string
         };
         const result = await this.contract.purchaseCollectible(overrides)
+        this.state++
+        this.loadData()
         return result;
     }
 
@@ -138,8 +182,15 @@ export class Remix {
         let overrides = {
             value: utils.parseEther(price.toString())     // ether in this case MUST be a string
         };
-        const result = await this.contract.purchaseRmx(overrides)
+        const result = await this.contract.purchaseRMX(overrides)
+        this.state++
+        this.loadData()
         return result;
+    }
+
+    async harvest(tokenAddress) {
+        await this.contract.harvestRoyalties(tokenAddress)
+        this.state++;
     }
 
     getTokenName(tokenID) {
@@ -152,6 +203,70 @@ export class Remix {
                 return "Derivative"
             case 3:
                 return "Badge"
+        }
+    }
+
+    startRMXPurchaseListener() {
+        try {
+            this.contract.on("RMXPurchased", (...events) => {
+                console.log("New RMXPurchased Event!")
+                const args = events[events.length - 1].args
+                this.contract.minPurchasePrice().then((data) => {
+                    this.RMXPrice = parseFloat(utils.formatEther(data));
+                    this.state++;
+                });
+            });
+            return () => {
+                this.contract.removeListener("RMXPurchased");
+            };
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
+    startCollectiblePurchaseListener() {
+        try {
+            this.contract.on("CollectiblePurchased", (...events) => {
+                console.log("New CollectiblePurchased Event!")
+                const args = events[events.length - 1].args
+                this.contract.collectiblePrice().then((data) => {
+                    this.CollectiblePrice = parseFloat(utils.formatEther(data));
+                    this.state++;
+                });
+            });
+            return () => {
+                this.contract.removeListener("CollectiblePurchased");
+            };
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
+    startRoyalitiesListener() {
+        try {
+            this.contract.on("RoyaltiesHarvested", (...events) => {
+                console.log("New RoyaltiesHarvested Event!")
+                const args = events[events.length - 1].args
+                this.state++;
+            });
+            return () => {
+                this.contract.removeListener("RoyaltiesHarvested");
+            };
+        } catch (e) {
+            console.log(e);
+        }
+
+        try {
+            this.contract.on("RoyaltyReceived", (...events) => {
+                console.log("New RoyaltyReceived Event!")
+                const args = events[events.length - 1].args
+                this.state++;
+            });
+            return () => {
+                this.contract.removeListener("RoyaltyReceived");
+            };
+        } catch (e) {
+            console.log(e);
         }
     }
 
@@ -170,6 +285,9 @@ export class Remix {
                 this.state++
             })
         })
+        this.startRMXPurchaseListener();
+        this.startCollectiblePurchaseListener();
+        this.startRoyalitiesListener();
     }
 
     loadData() {
@@ -224,37 +342,40 @@ export class Remix {
     }
 
     get isValid() {
-        if (!this.uri ||
-            !this.RMXMetadata ||
-            !this.CollectibleMetadata ||
-            !this.CollectiblePrice ||
-            !this.RMXPrice ||
-            !this.RMXincrease ||
-            !this.royalty ||
-            !this.maxRMXTime ||
-            !this.authors || this.authors.length == 0 ||
-            !this.authorsSplits || this.authorsSplits.length != this.authors.length) 
-            {
-            return false;
-            }
-        if (this.parent.length > 0) {
-            if (!this.parentsSplits || this.parents.length != this.parentsSplits.length) {
-                return false;
-            }
-        }
+        if (!this.uri) return false;
+        if (!this.RMXMetadata) return false;
+        if (!this.CollectibleMetadata) return false;
+        if (!this.CollectiblePrice) return false;
+        if (!this.RMXPrice) return false;
+        if (!this.RMXincrease) return false;
+        if (!this.royalty) return false;
+        if (!this.maxRMXTime) return false;
+        if (!this.authors) return false;
+        if (!this.authorsSplits) return false;
+        if (this.authors.length == 0) return false;
+        if (this.authors.length != this.authorsSplits.length) return false;
+        if (this.parents.length != this.parentsSplits.length) return false;
+        if (!this.RMXMetadata.name) return false;
+        if (!this.RMXMetadata.description) return false;
+        if (!this.RMXMetadata.image) return false;
+        if (!this.RMXMetadata.files) return false;
+        if (!this.CollectibleMetadata.name) return false;
+        if (!this.CollectibleMetadata.description) return false;
+        if (!this.CollectibleMetadata.image) return false;
         return true;
     }
 
     async uploadMetadata() {
+        console.log("About to upload metadata:", this.RMXMetadata, this.CollectibleMetadata)
         let files = [];
         if (!this.RMXMetadata)
-            throw "Remix Metadata are not set!"
+            throw new Error("Remix Metadata are not set!")
         files.push({
             path: "metadata/0.json",
             content: JSON.stringify(this.RMXMetadata),
         });
         if (!this.CollectibleMetadata)
-            throw "Collectible Metadata are not set!"
+            throw new Error("Collectible Metadata are not set!")
         files.push({
             path: "metadata/1.json",
             content: JSON.stringify(this.CollectibleMetadata),
@@ -272,8 +393,8 @@ export class Remix {
     }
 
     async deploy() {
-        // if (!this.isValid)
-        //     throw "Not all fields have been set!";
+        if (!this.isValid)
+            throw "Not all fields have been set!";
         if (!this.signer)
             throw "Signer has not been defined!";
         const factory = new ethers.ContractFactory(this.artifact.abi, this.artifact.bytecode, this.signer);
@@ -287,20 +408,24 @@ export class Remix {
     }
 }
 
-class RemixFactory {
+export class RemixFactory {
     constructor(address, signer) {
         if (!address) throw new Error("Please set the address of the RemixFactory!")
         this.address = address;
         this.signer = signer;
         this.artifact = require("../contracts/RemixFactory.json");
         this.remixContracts = {}
+        this.events = {};
+        this.state = 0;
+        this.addCallbacks = [];
         if (address) {
             if (signer) {
                 this.contract = new ethers.Contract(this.address, this.artifact.abi, signer);
+                this.loadRemixes();
+                this.startListener()
             } else {
                 this.contract = new ethers.Contract(this.address, this.artifact.abi);
             }
-            this.loadRemixes();
         }
     }
 
@@ -317,13 +442,45 @@ class RemixFactory {
         })
     }
 
-    deploy(remix) {
+    startListener() {
+        try {
+            this.contract.on("RemixDeployed", (...events) => {
+                console.log("New RemixDeployed Event!")
+                const args = events[events.length - 1].args
+                if (!this.remixContracts[args.contractAddress]) {
+                    this.remixContracts[args.contractAddress] = new Remix(args.contractAddress, this.signer)
+                    this.addCallbacks.forEach((callback) => {
+                        callback(this.remixContracts[args.contractAddress])
+                    })
+                    this.state++
+                }
+            });
+            return () => {
+                this.contract.removeListener("RemixDeployed");
+            };
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
+    registerAddCallback(callback) {
+        this.addCallbacks.push(callback)
+    }
+
+    async deploy(remix) {
+        let contractsBefore = await this.getRemixByAuthor(remix.authors[0])
+        console.log("Deploying with Remix:", remix)
         if (!this.signer) throw new Error("Signer is not set!");
-        const contract = await factory.deploy(...this.deployArgs);
-        if (!contract.address)
-            throw "There was an unknown error and the address of the contract is not avaiable";
-        return new Remix(contract.address, this.signer);
+        console.log("About to deploy with: ", remix.deployArgs)
+        const tx = await this.contract.deploy(...remix.deployArgs);
+        let contractsAfter = await this.getRemixByAuthor(remix.authors[0])
+
+        if (contractsBefore.length == contractsAfter.length)
+            throw new Error("There was an unknown error and the address of the contract is not avaiable");
+        const newContractAddress = contractsAfter[contractsAfter.length-1];
+        const newRemix = new Remix(newContractAddress, this.signer)
+        this.remixContracts[newContractAddress] = newRemix;
+        this.state++
+        return newRemix;
     }
 }
-
-export default { Remix, RemixFactory };

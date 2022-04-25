@@ -14,27 +14,13 @@ const { ethers } = require("ethers");
 const DEBUG = true;
 
 const useRemix = (remixFactory, userSigner) => {
-    const [remixContracts, setRemixContracts] = useState(remixFactory.remixContracts);
-    let lastIndex = 0;
+    const [remixContracts, setRemixContracts] = useState(remixFactory ? remixFactory.remixContracts : {});
 
     useEffect(() => {
-        if (remixFactory && address) {
-            try {
-                remixFactory.contract.on("RemixDeployed", (...events) => {
-                    const args = events[events.length - 1].args
-                    if (!remixContracts[args.contractAddress]) {
-                        remixContracts[args.contractAddress] = new Remix(args.contractAddress, userSigner)
-                    }
-                    setRemixContracts(remixContracts);
-                });
-                return () => {
-                    remixFactory.contract.removeListener("RemixDeployed");
-                };
-            } catch (e) {
-                console.log(e);
-            }
+        if (remixFactory) {
+            setRemixContracts(remixFactory.remixContracts);
         }
-    }, [remixFactory, address]);
+    }, [remixFactory.state]);
 
     return remixContracts;
 };
@@ -43,19 +29,21 @@ const useAddressRemixes = ( remixFactory, address) => {
     const [myContracts, setMyContracts] = useState([]);
 
     const getContracts = async () => {
-        const contractAddresses = await remixFactory.getRemixByAuthor(address);
-        setMyContracts(contractAddresses);
+        remixFactory.getRemixByAuthor(address).then((contractAddresses) => {
+            setMyContracts(contractAddresses);
+        })
     }
     
     useEffect(() => {
-        if (remixFactory && address) {
+        if (remixFactory.contract && address) {
             getContracts();
             try {
                 remixFactory.contract.on("RemixDeployed", (...events) => {
                     const args = events[events.length - 1].args
-                    if (args.authors.includes(address)) {
-                        myContracts.push(args.contractAddress)
-                        setMyContracts(myContracts)
+                    if (args.authors.includes(address) && !myContracts.includes(args.contractAddress)) {
+                        let contracts = [...myContracts];
+                        contracts.push(args.contractAddress)
+                        setMyContracts(contracts)
                     }
                 });
                 return () => {
@@ -65,7 +53,7 @@ const useAddressRemixes = ( remixFactory, address) => {
                 console.log(e);
             }
         }
-    }, [remixFactory, address]);
+    }, [remixFactory, address, remixFactory.state]);
 
     return myContracts;
 };

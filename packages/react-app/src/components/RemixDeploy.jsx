@@ -1,8 +1,9 @@
-import { notification, Spin, Typography, Collapse, Button, Form, Input, InputNumber, List, Avatar, Row, Col, Divider } from "antd";
+import { notification, Spin, Modal, Typography, Collapse, Button, Form, Input, InputNumber, List, Avatar, Row, Col, Divider, Result } from "antd";
 import React, {useState, useEffect } from "react";
 import { FileImageOutlined, SettingOutlined, EditOutlined, UserAddOutlined, UserDeleteOutlined, DeleteOutlined } from '@ant-design/icons';
 import { UploadRemixFiles, ParentSplitField, AddressField, RemixListItem } from ".";
 import { Remix } from "../helpers";
+import { useHistory } from "react-router-dom";
 
 const { BufferList } = require('bl')
 const ipfsAPI = require('ipfs-http-client');
@@ -24,7 +25,10 @@ export default function RemixDeploy(props) {
   const [parentsSplitFields, setParentsSplitFields] = useState([]);
   const [collectibleMetadata, setCollectibleMetadata] = useState({});
   const [remixMetadata, setRemixMetadata] = useState({});
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [address, setAddress] = useState(props.signer ? props.signer.address : "")
+  const [splitSum, setSplitSum] = useState(0);
+  let history = useHistory();
 
   const { Panel } = Collapse;
   const { Title } = Typography;
@@ -49,9 +53,8 @@ export default function RemixDeploy(props) {
       <AddressField
         key={author.key}
         author={author}
-        splitRule={isSplitValid}
         onDelete={(author) => { authors.splice(author.key); updateAuthors(authors); }}
-        onChange={(author) => { authors[author.key] = author; setAuthors(authors); }}
+        onChange={(author) => { authors[author.key] = author; setAuthors(authors); updateSplitSum(); }}
       />
       )
     )
@@ -63,9 +66,8 @@ export default function RemixDeploy(props) {
     let newParentSplitFields = parents.map((parent) => (
       <ParentSplitField 
         parent={parent}
-        splitRule={isSplitValid}
         onDelete={(parent) => {parents.splice(parent.key); updateParents(parents)}}
-        onChange={(parent) => {parents[parent.key] = parent; setParents(parents); }}
+        onChange={(parent) => {parents[parent.key] = parent; setParents(parents); updateSplitSum();}}
       />
     ))
     setParentsSplitFields(newParentSplitFields);
@@ -83,23 +85,13 @@ export default function RemixDeploy(props) {
   }, [props.address])
 
   useEffect(() => {
-    // Want to check that the parent splits is < 100 
-    let sumSplit = 0;
-    parents.forEach((parent, i) => { sumSplit += parent.split })
-    if (sumSplit <= 100) {
-      console.error("Sum of parents splits is more than 100!");
-    }
     makeParentsSplitFields();
+    updateSplitSum();
   }, [parents])
 
   useEffect(() => {
-    let sumSplit = 0;
-    authors.forEach((author, i) => {sumSplit+=author.split})
-    if (sumSplit != 100) {
-      console.error("Sum of authors splits is not 100!");
-    }
     makeAuthorsFields();
-    // Want to check that the sum of author split is < 100
+    updateSplitSum();
   }, [authors])
 
   useEffect(() => {
@@ -115,13 +107,22 @@ export default function RemixDeploy(props) {
     })
     return exists;
   }
-  
+
+  const updateSplitSum = () => {
+    let sumSplit = 0;
+    authors.forEach((author) => { sumSplit += author.split })
+    parents.forEach((parent) => { sumSplit += parent.split })
+    console.log("Updated sum:", sumSplit)
+    setSplitSum(sumSplit);
+    return sumSplit;
+  }
+
+ 
   const isSplitValid = ({ getFieldValue }) => ({
     validator(_, value) {
-      let sumSplit = 0;
-      authors.forEach((author) => { sumSplit += author.split })
-      parents.forEach((parent) => { sumSplit += parent.split })
-      if (sumSplit == 100) {
+      const sumsplit = updateSplitSum();
+      console.log("Split sum is: ", sumsplit)
+      if (sumsplit == 100) {
         return Promise.resolve();
       }
       return Promise.reject(new Error('The total of splits is not 100%!'));
@@ -138,14 +139,14 @@ export default function RemixDeploy(props) {
     remix.parents = parents.map((parent) => (parent.address))
     remix.parentsSplits = parents.map((parent) => (parent.split * 100))
     remix.RMXPrice = values.RMXprice
-    remix.RMXincrease = values.RMXincrease
+    remix.RMXincrease = values.RMXincrease * 100
     remix.NFTprice = values.NFTprice
     remix.maxRMXTime = 10000
     remix.RMXMetadata = remixMetadata
     remix.CollectibleMetadata = collectibleMetadata
     remix.royalty = 1000
 
-    console.log("About to deploy:", remix, remix.deployArgs);
+    console.log("Uploading Metadata")
     // Uploading Metadata
     remix.uploadMetadata().then((hash, uri) => {
       notification.info({
@@ -153,26 +154,14 @@ export default function RemixDeploy(props) {
         placement: "bottomRight",
       });
       // Deploying Remix contract
-      remix.deploy().then((contract) => {
+      console.log("About to deploy with Factory:", remixFactory);
+      remixFactory.deploy(remix).then((contract) => {
         notification.info({
           message: "Remix contract deployed! Address is:" + contract.address,
           placement: "bottomRight",
         });
-        // Registering Remix contract
-        remix.registerContract(remixFactory).then(() => {
-          notification.info({
-            message: "Contract is registered with this website!",
-            placement: "bottomRight",
-          });
-          setIsDeploying(false);
-        }).catch((error) => {
-          setIsDeploying(false);
-          console.log(error)
-          notification.error({
-            message: error.message,
-            placement: "bottomRight",
-          });
-        })
+        setIsDeploying(false);
+        setIsModalVisible(true);
       }).catch((error) => {
         setIsDeploying(false);
         console.log(error)
@@ -207,7 +196,10 @@ export default function RemixDeploy(props) {
         layout="vertical"
         initialValues={{
           "author0": address,
-          "authorSplit0": 100
+          "authorSplit0": 100,
+          "RMXprice":0.1,
+          "RMXincrease":5,
+          "NFTprice":0.1
         }}
       >
       <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} justify="space-between">
@@ -232,33 +224,36 @@ export default function RemixDeploy(props) {
               <Form.Item
                 label="Name"
                 name="collectibleName"
-                values={collectibleMetadata.name}
+                labelCol={{ span: 12 }}
                 rules={[{ required: true, message: 'Please give this artwork a name!' }]}
               >
-                <Input onChange={(e) => { const c = {...collectibleMetadata}; c.name = e.target.value; setCollectibleMetadata(c)}}/>
+                <Input placeholder="My collectible title" onChange={(e) => { const c = {...collectibleMetadata}; c.name = e.target.value; setCollectibleMetadata(c)}}/>
               </Form.Item>
               <Form.Item
                 label="Description"
                 name="collectibleDescription"
+                labelCol={{ span: 12 }}
                 rules={[{ required: true, message: 'Please describe this artwork!' }]}
               >
-                <TextArea rows={4} onChange={(e) => { const c = {...collectibleMetadata}; c.description = e.target.value; setCollectibleMetadata(c) }}/>
+                <TextArea placeholder="A really catchy description" rows={4} onChange={(e) => { const c = {...collectibleMetadata}; c.description = e.target.value; setCollectibleMetadata(c) }}/>
               </Form.Item>
             </Panel>
             <Panel forceRender={true} header="Remix" key="2">
               <Form.Item
                 label="Name"
                 name="remixName"
+                labelCol={{ span: 12 }}
                 rules={[{ required: true, message: 'Please give this remix NFT a name!' }]}
               >
-                <Input onChange={(e) => { const r = {...remixMetadata}; r.name = e.target.value; setRemixMetadata(r) }}/>
+                <Input placeholder="My RMX title" onChange={(e) => { const r = {...remixMetadata}; r.name = e.target.value; setRemixMetadata(r) }}/>
               </Form.Item>
               <Form.Item
                 label="Description"
                 name="remixDescription"
+                labelCol={{ span: 12 }}
                 rules={[{ required: true, message: 'Please describe this remix NFT!' }]}
               >
-                <TextArea rows={4} onChange={(e) => { const r = {...remixMetadata}; r.description = e.target.value; setRemixMetadata(r) }}/>
+                <TextArea placeholder="A detailed description of what is included and how to use it." rows={4} onChange={(e) => { const r = {...remixMetadata}; r.description = e.target.value; setRemixMetadata(r) }}/>
               </Form.Item>
             </Panel>
             <Panel forceRender={true} header="Authors" key="3">
@@ -281,20 +276,26 @@ export default function RemixDeploy(props) {
               <Form.Item 
               label="RMX price"
               name="RMXprice"
+              labelCol={{ span: 12, offset: 0 }}
               rules={([ {required: true, message: 'Please set a base price for the RMX'}])}
               >
                 <InputNumber />
               </Form.Item>
               <Form.Item
-                label="RMX increase minima"
+                label="RMX increase curve"
                 name="RMXincrease"
+                labelCol={{ span: 12, offset: 0 }}
                 rules={([{ required: true, message: 'Please set a base price for the RMX increase minima' }])}
               >
-                <InputNumber />
+                <InputNumber 
+                  formatter={value => `${value}%`}
+                  parser={value => value.replace('%', '')}
+                  placeholder={5} />
               </Form.Item>
               <Form.Item
                 label="NFT price"
                 name="NFTprice"
+                labelCol={{ span: 12, offset: 0 }}
                 rules={([{ required: true, message: 'Please set a base price for the NFT' }])}
               >
                 <InputNumber />
@@ -339,6 +340,20 @@ export default function RemixDeploy(props) {
           </Form.Item>
         </Col>
       </Row>
+      <Modal
+        forceRender={true}
+        title="Congratulation"
+        visible={isModalVisible}
+        footer={null}
+        onCancel={() => { setIsModalVisible(false); history.push("/mine") }}
+        onOk={() => { setIsModalVisible(false); history.push("/mine") }}
+      >
+        <Result
+          status="success"
+          title="You just minted a Remix NFT!"
+          subTitle="Congratulation on creating a new Remix, keep up with the creative flow!"
+        />
+      </Modal>
     </Form>
   );
 }

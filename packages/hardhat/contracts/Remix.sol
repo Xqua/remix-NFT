@@ -271,6 +271,15 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         return parents;
     }
 
+    function getRoyalties() public view returns(address[] memory tokenAddresses, uint256[] memory values) {
+        tokenAddresses = new address[](1);
+        values = new uint256[](1);
+        tokenAddresses[0] = address(0);
+        values[0] = address(this).balance;
+        return (tokenAddresses, values);
+        // TODO: find how to get the ERC20 received by this contract to add them here
+    }
+
     function licenseActive(address _holder) public view returns (bool) {
         bool isAuthor = false;
         for (uint i = 0; i < authors.length; i++) {

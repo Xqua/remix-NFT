@@ -130,9 +130,7 @@ function App(props) {
   const [address, setAddress] = useState();
   const [selectedContract, setSelectedContract] = useState();
   const [remixContext, setRemixContext] = useState({});
-
-
-
+  const [remixFactory, setRemixFactory] = useState({});
 
   /* 💵 This hook will get the price of ETH from 🦄 Uniswap: */
   const price = useExchangePrice(targetNetwork, mainnetProvider);
@@ -176,7 +174,6 @@ function App(props) {
 
   // If you want to make 🔐 write transactions to your contracts, use the userSigner:
   const writeContracts = useContractLoader(userSigner, { chainId: localChainId });
-
   // EXTERNAL CONTRACT EXAMPLE:
   //
   // If you want to bring in the mainnet DAI contract it would look like:
@@ -198,8 +195,16 @@ function App(props) {
   //let collectiblesCount = useContractReader(readContracts, "YourCollectible", "getCurrentTokenID");
   //const numberCollectiblesCount = collectiblesCount && collectiblesCount.toNumber && collectiblesCount.toNumber();
   
-  const remixContracts = useRemix(localProvider, readContracts, userSigner)
-  const myRemixContracts = useAddressRemixes(readContracts, address)
+  const remixContracts = useRemix(remixFactory, userSigner)
+  const myRemixContracts = useAddressRemixes(remixFactory, address)
+
+  useEffect(() => {
+    if (writeContracts && writeContracts["RemixFactory"] && userSigner) {
+      const factory = new RemixFactory(writeContracts["RemixFactory"].address, userSigner)
+      console.log("->>>>>>FACTORY", factory)
+      setRemixFactory(factory)
+    } 
+  }, [writeContracts, userSigner])
 
   useEffect(() => {
     remixContext.remixContracts = remixContracts
@@ -224,8 +229,7 @@ function App(props) {
       yourMainnetBalance &&
       readContracts &&
       writeContracts &&
-      mainnetContracts &&
-      remixContracts
+      mainnetContracts
     ) {
       console.log("_____________________________________ 🏗 scaffold-eth _____________________________________");
       console.log("🌎 mainnetProvider", mainnetProvider);
@@ -238,8 +242,9 @@ function App(props) {
       console.log("🌍 DAI contract on mainnet:", mainnetContracts);
       console.log("💵 yourMainnetDAIBalance", myMainnetDAIBalance);
       console.log("🔐 writeContracts", writeContracts);
-      console.log("🔐 events", mintEvents);
-      console.log("🔐 Remix Contracts", remixContracts);
+      console.log("🔐 RemixFactory", remixFactory);
+      console.log("📝 Remix Contracts", remixContracts);
+      console.log("📝 My Remix Contracts", myRemixContracts);
     }
   }, [
     mainnetProvider,
@@ -250,7 +255,8 @@ function App(props) {
     readContracts,
     writeContracts,
     mainnetContracts,
-    remixContracts
+    remixContracts,
+    myRemixContracts
   ]);
 
   let networkDisplay = "";
@@ -372,7 +378,7 @@ function App(props) {
   const [transferToAddresses, setTransferToAddresses] = useState({});
 
   useEffect(() => {
-    setSelectedContract((Object.keys(remixContracts)[0]))
+    if (remixContracts) setSelectedContract((Object.keys(remixContracts)[0]))
   }, [remixContracts])
 
   return (
@@ -423,30 +429,20 @@ function App(props) {
               Debug Contracts
             </Link>
           </Menu.Item>
-          <Menu.Item key="/one">
-            <Link
-              onClick={() => {
-                setRoute("/one");
-              }}
-              to="/one"
-            >
-              Show one
-            </Link>
-          </Menu.Item>
         </Menu>
 
         <Content style={{ margin: 'auto', maxWidth: 1200}}>
           <Switch>
             <Route exact path="/">
               <RemixCardList
-                  remixContracts={remixContracts}
+                  remixContracts={remixContracts ? remixContracts : []}
                   setSelectedContract={setSelectedContract}
                   setRoute={setRoute}
                 />
             </Route>
               <Route exact path="/mine">
                 <RemixCardList
-                  remixContracts={myRemixContracts.map(contract => remixContracts[contract])}
+                  remixContracts={remixContracts ? myRemixContracts.map(contract => remixContracts[contract]) : []}
                   setSelectedContract={setSelectedContract}
                   setRoute={setRoute}
                 />
@@ -454,8 +450,8 @@ function App(props) {
             <Route path="/mint">
               <RemixDeploy
                 address={address}
-                remixContracts={Object.keys(remixContracts).map((remix) => (remixContracts[remix])).filter((remix) => remix.canDerive)}
-                remixFactory={writeContracts ? writeContracts["RemixFactory"] : null}
+                  remixContracts={remixContracts ? Object.keys(remixContracts).map((remix) => (remixContracts[remix])).filter((remix) => remix.canDerive): []}
+                remixFactory={remixFactory}
                 signer={userSigner}
               />
             </Route>
@@ -468,11 +464,6 @@ function App(props) {
                 address={address}
                 blockExplorer={blockExplorer}
               />
-            </Route>
-            <Route path="/one" >
-              {selectedContract ? 
-                <RemixContainer remix={remixContracts[selectedContract]} />
-              : null}
             </Route>
           </Switch>
         </Content>

@@ -67,6 +67,8 @@ export default function Contract({
   const address = customAddress ? customAddress : contract.address;
   const contractIsDeployed = useContractExistsAtAddress(provider, address);
 
+  console.log(contract, address, contractIsDeployed)
+
   const displayedContractFunctions = useMemo(
     () =>
       contract

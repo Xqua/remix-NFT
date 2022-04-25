@@ -30,7 +30,8 @@ export default function AddressField(props) {
                 <Form.Item
                     label="Split"
                     name={"authorSplit" + props.author.key}
-                    rules={[{ required: true, message: 'Please give a split amount to this author!' }, props.splitRule]}
+                    labelCol={{ span: 12 }}
+                    rules={[{ required: true, message: 'Please give a split amount to this author!' }]}
                 >
                     <InputNumber
                         values={props.author.split}

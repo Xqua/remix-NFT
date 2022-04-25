@@ -5,9 +5,39 @@ const ipfs = ipfsAPI({host: 'ipfs.infura.io', port: '5001', protocol: 'https' })
 
 const { utils } = require("ethers");
 
+const buildArgs = (authors, parents = [], tokenURI = null) => {
+  let authorsSplits = [10000]
+  let parentsSplits = [];
+  if (authors.length > 0) {
+    const split = parseInt(10000 / (authors.length + parents.length))
+    authorsSplits = authors.map(() => (split))
+    parentsSplits = parents.map(() => (split))
+    if (split * (authors.length + parents.length) != 10000) {
+      authorsSplits[0] += 10000 - split * (authors.length + parents.length)
+    }
+  }
+  if (!tokenURI) {
+    tokenURI = "https://ipfs.io/ipfs/QmQB9UgvdA1fC1wHZcHZtNG1kDFnmkhnGTsDyU6zjquYbR/RMX_1_{id}.json"
+  }
+  let args = [
+    tokenURI,   // string memory uri_,
+    authors,  // address[] memory _authors,
+    authorsSplits,// uint256[] memory _authorSplits,
+    parents, // address[] memory _parents,
+    parentsSplits, // uint256[] memory _parentSplits,
+    utils.parseEther("0.01"), // uint256 _startingPrice,
+    1000, // uint256 _increasePoints,
+    utils.parseEther("0.1"), // uint256 _collectiblePrice,
+    10000, // uint256 _rmxCountdown,
+    100] // uint256 _royalties
+  return args;
+} 
+
+
 module.exports = async ({ getNamedAccounts, deployments }) => {
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
+  const burner = "0xE8B791bF71366717D1B0bDe618CaD05d91448798"
 
   // First, we upload the metadata to IPFS and get the CID  
   const file = await ipfs.add(globSource("./RMXMetadata", { recursive: true }))
@@ -18,72 +48,38 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 
   console.log(tokenUri_1);
 
-  await deploy("RemixRegistry", {
+  const result = await deploy("RemixFactory", {
     // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
     from: deployer,
-    args: [],
+    args:[],
     log: true,
   });
 
-  const registry = await ethers.getContract("RemixRegistry", deployer);
-  const authors = [deployer];
-  args = [
-    tokenUri_1,   // string memory uri_,
-    authors,  // address[] memory _authors,
-    [10000],// uint256[] memory _authorSplits,
-    [], // address[] memory _parents,
-    [], // uint256[] memory _parentSplits,
-    utils.parseEther("0.01"), // uint256 _startingPrice,
-    utils.parseEther("0.01"), // uint256 _increasePoints,
-    utils.parseEther("0.1"), // uint256 _collectiblePrice,
-    10000, // uint256 _rmxCountdown,
-    100] // uint256 _royalties
+  //const inter = new utils.Interface(result.abi);
 
+  const remixFactory = await ethers.getContract("RemixFactory", deployer);
 
-  console.log("Deployer is:", deployer)
+  args = buildArgs([deployer], [], tokenUri_1)
 
-  const remix1 = await deploy("Remix", {
+  const remix1 = await remixFactory.deploy(...args);
+  const remix1Addr = await remixFactory.getRemixByAuthor(deployer)
+
+  args = buildArgs([deployer, burner], [remix1Addr[remix1Addr.length-1]], tokenUri_2)
+  
+  const remix2 = await remixFactory.deploy(...args);
+
+  args = buildArgs([deployer, burner], [remix1Addr[remix1Addr.length - 1]], tokenUri_3)
+
+  const resultRemix = await deploy("Remix", {
     // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
     from: deployer,
-    args: args,
+    args: [""],
     log: true,
   });
 
-  await registry.registerRemix(args[1], remix1.address);
+  //const remix3 = await ethers.getContract("Remix", deployer);
 
-  args[0] = tokenUri_2;
-  args[1].push("0xE8B791bF71366717D1B0bDe618CaD05d91448798")
-  args[2] = [4000, 5000];
-  args[3].push(remix1.address)
-  args[4].push(1000);
-
-  const remix2 = await deploy("Remix", {
-    // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
-    from: deployer,
-    args: args,
-    log: true,
-  });
-
-  await registry.registerRemix(args[1], remix2.address);
-
-
-  // args[0] = tokenUri_3;
-
-  // const remix3 = await deploy("Remix", {
-  //   // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
-  //   from: deployer,
-  //   args: args,
-  //   log: true,
-  // });
-
-  // await registry.registerRemix(args[1], remix3.address);
-  /*
-    // Getting a previously deployed contract
-    const YourContract = await ethers.getContract("YourContract", deployer);
-    await YourContract.setPurpose("Hello");
-    
-    //const yourContract = await ethers.getContractAt('YourContract', "0xaAC799eC2d00C013f1F11c37E654e59B0429DF6A") //<-- if you want to instantiate a version of a contract at a specific address!
-  */
+  remixFactory.registerRemix(resultRemix.address)
 };
 module.exports.tags = ["Remix"];
 

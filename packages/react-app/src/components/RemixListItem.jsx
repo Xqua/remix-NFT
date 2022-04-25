@@ -18,7 +18,6 @@ export default function RemixListItem(props) {
 
     useEffect(() => {
         setRemix({ ...props.remix })
-        console.log("Remix updated!", remix)
     }, [props.remix.state])
 
     const isLoading = () => {
@@ -45,6 +44,7 @@ export default function RemixListItem(props) {
                 </Space>
             </Skeleton>
             <Modal 
+                forceRender={true}
                 title={selectedRemix?.RMXMetadata?.name} 
                 visible={isModalVisible} 
                 onOk={() => setIsModalVisible(false)} 

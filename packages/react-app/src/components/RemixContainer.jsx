@@ -2,47 +2,44 @@ import React, { useState, useEffect, useContext } from "react";
 import {Row, Col, Card, Collapse, Skeleton, Image, List, Button, Space, Divider} from "antd";
 import { FileImageFilled, FileZipFilled, EditOutlined } from "@ant-design/icons";
 import Blockies from "react-blockies";
-import { RemixListItem, RemixActivity, BuyNFTButton, BuyRMXButton } from ".";
+import { RemixListItem, RemixActivity, BuyNFTButton, BuyRMXButton, RemixValueHeld } from ".";
 import { RemixContext } from "../helpers"
 
 export default function RemixContainer(props) {
-    const [remix, setRemix] = useState(props.remix);
     const [showCollectible, setShowCollectible]=useState(true);
     const [metadata, setMetadata] = useState({});
 
     const updateMetadata = () => {
-        if (showCollectible) {
-            setMetadata({...remix.CollectibleMetadata})
-        } else {
-            setMetadata({...remix.RMXMetadata})
-        } 
+        if (props.remix) {
+            if (showCollectible) {
+                setMetadata({...props.remix.CollectibleMetadata})
+            } else {
+                setMetadata({...props.remix.RMXMetadata})
+            } 
+        }
     }
 
     const [remixContext, setRemixContext] = useContext(RemixContext);
-
-    useEffect(() => {
-        setRemix(props.remix)
-    }, [props.remix])
-
+    //console.log(remixContext)
     useEffect(() => {
         updateMetadata();
-        console.log("Remix updated!", remix)
-    }, [remix.state])
+        //console.log("Remix updated!", props.remix)
+    }, [props.remix?.state])
 
     useEffect(() => { 
         updateMetadata();
-    }, [showCollectible, remix.state])
+    }, [showCollectible, props.remix?.state])
     
     const isLoading = () => {
-        if (remix == null) return true;
-        if (remix.RMXMetadata == null) return true;
-        if (remix.RMXMetadata.image == null) return true;
-        if (remix.RMXMetadata.name == null) return true;
-        if (remix.RMXMetadata.description == null) return true;
-        if (remix.CollectibleMetadata == null) return true;
-        if (remix.CollectibleMetadata.image == null) return true;
-        if (remix.CollectibleMetadata.name == null) return true;
-        if (remix.CollectibleMetadata.description == null) return true;
+        if (props.remix == null) return true;
+        if (props.remix.RMXMetadata == null) return true;
+        if (props.remix.RMXMetadata.image == null) return true;
+        if (props.remix.RMXMetadata.name == null) return true;
+        if (props.remix.RMXMetadata.description == null) return true;
+        if (props.remix.CollectibleMetadata == null) return true;
+        if (props.remix.CollectibleMetadata.image == null) return true;
+        if (props.remix.CollectibleMetadata.name == null) return true;
+        if (props.remix.CollectibleMetadata.description == null) return true;
         return false;
     }
 
@@ -70,7 +67,7 @@ export default function RemixContainer(props) {
                     >
                     <Skeleton avatar active loading={metadata?.image == null}>
                         <Meta
-                            avatar={<Blockies seed={remix.author != null ? remix.authors[0].toLowerCase() : "seed"} />}
+                            avatar={<Blockies seed={props.remix?.author != null ? props.remix.authors[0].toLowerCase() : "seed"} />}
                             title={metadata?.name}
                             description={metadata?.description}
                             />
@@ -80,17 +77,18 @@ export default function RemixContainer(props) {
             <Col className="gutter-row" span={12}>
                 <Collapse accordion>
                     <Panel header="About" key="about">
-                        <p>Authors: {remix.authors ? remix.authors.join(", ") : ""} </p>
-                        <p>{remix.isCollectibleAvailable ? 
-                            "Current Collectible NFT price: " + <b>remix.CollectiblePrice</b> + " Eth" :
-                            "The collectible NFT was bought for: " + <b>remix.CollectiblePrice</b> + " Eth"
+                        <p>Authors: {props.remix?.authors ? props.remix.authors.join(", ") : ""} </p>
+                        <p>Address: {props.remix?.address ? props.remix.address : ""} </p>
+                        <p>{props.remix?.isCollectibleAvailable ? 
+                            "Current Collectible NFT price: " + <b>props.remix?.CollectiblePrice</b> + " Eth" :
+                            "The collectible NFT was bought for: " + <b>props.remix?.CollectiblePrice</b> + " Eth"
                         }</p>
-                        <p>The RMX token is available for: <b>{remix.RMXPrice}</b> Eth</p>
+                        <p>The RMX token is available for: <b>{props.remix?.RMXPrice}</b> Eth</p>
                     </Panel>
-                    {remix.canDerive ? 
+                    {props.remix?.canDerive ? 
                         <Panel header="RAW Files" key="rawFiles">
                             <p>Access to the remixable files</p>
-                            <Button type="primary" href={remix.RMXMetadata.files}>Download</Button>
+                            <Button type="primary" href={props.remix.RMXMetadata?.files}>Download</Button>
                         </Panel>
                         :
                         null
@@ -98,7 +96,7 @@ export default function RemixContainer(props) {
                     <Panel header="Parent creations" key="parents">
                         <List
                             itemLayout="horizontal"
-                            dataSource={remixContext.remixContracts && remix.parents ? remix.parents.map(address => (remixContext.remixContracts[address])) : []}
+                            dataSource={remixContext.remixContracts && props.remix?.parents ? props.remix.parents.map(address => (remixContext.remixContracts[address])) : []}
                             renderItem={item => (
                                 <RemixListItem 
                                     remix={item} 
@@ -111,7 +109,7 @@ export default function RemixContainer(props) {
                     <Panel header="Children creations" key="children">
                         <List
                             itemLayout="horizontal"
-                            dataSource={remixContext.remixContracts && remix.children ? remix.children.map(address => (remixContext.remixContracts[address])) : []}
+                            dataSource={remixContext.remixContracts && props.remix?.children ? props.remix.children.map(address => (remixContext.remixContracts[address])) : []}
                             renderItem={item => (
                                 <RemixListItem 
                                     remix={item} 
@@ -124,11 +122,11 @@ export default function RemixContainer(props) {
                     <Panel header="Price history" key="price">
                         <List
                             itemLayout="vertical"
-                            dataSource={remix?.priceHistory}
-                            renderItem={item => (item + " | ")} />
+                            dataSource={props.remix?.priceHistory}
+                            renderItem={item => (`${item.token}: ${item.price}`)} />
                     </Panel>
                     <Panel header="Activity" key="activity">
-                        <RemixActivity remix={remix} />
+                        <RemixActivity remix={props.remix} />
                     </Panel>
                     <Panel header="Remix and Usage Rights" key="rights">
                         
@@ -136,9 +134,11 @@ export default function RemixContainer(props) {
                 </Collapse>
                 <Divider />
                 <Space>
-                    <BuyNFTButton remix={remix} type="primary" /> 
-                    <BuyRMXButton remix={remix} type="primary" />
+                    <BuyNFTButton remix={props.remix} type="primary" /> 
+                    <BuyRMXButton remix={props.remix} type="primary" />
                 </Space>
+                <Divider />
+                <RemixValueHeld remix={props.remix}/>
             </Col>
         </Row>
     )

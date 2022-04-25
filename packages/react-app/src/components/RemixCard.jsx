@@ -18,8 +18,7 @@ export default function RemixCard(props) {
     }, [props.remix])
 
     useEffect(() => {
-        setRemix({ ...props.remix })
-        console.log("Remix updated!", remix)
+        setRemix(props.remix)
     }, [props.remix.state])
 
     const { Meta } = Card;
@@ -27,8 +26,7 @@ export default function RemixCard(props) {
     return (
         <Card
             style={{ width: 300 }}
-            cover={
-                remix?.CollectibleMetadata == null ? 
+            cover={remix?.CollectibleMetadata == null ? 
                 <Skeleton.Image active style={{width:300, height:200}} />
                 :
                 <Image
@@ -59,6 +57,7 @@ export default function RemixCard(props) {
                 </Col>
             </Row>
             <Modal
+                forceRender={true}
                 title={remix?.CollectibleMetadata?.name}
                 visible={isModalVisible}
                 onOk={() => setIsModalVisible(false)}
@@ -68,6 +67,7 @@ export default function RemixCard(props) {
                 <RemixContainer remix={remix} />
             </Modal>
             <Modal 
+                forceRender={true}
                 title="Buy this Remix" 
                 visible={isBuyModalVisible}
                 onOk={() => setIsBuyModalVisible(false)}
