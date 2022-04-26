@@ -25,7 +25,7 @@ const buildArgs = (authors, parents = []) => {
     parents, // address[] memory _parents,
     parentsSplits, // uint256[] memory _parentSplits,
     utils.parseEther("0.01"), // uint256 _startingPrice,
-    utils.parseEther("0.01"), // uint256 _increasePoints,
+    100, // uint256 _increasePoints,
     utils.parseEther("0.1"), // uint256 _collectiblePrice,
     10000, // uint256 _rmxCountdown,
     100] // uint256 _royalties
@@ -117,7 +117,6 @@ describe("Remix-NFT", function () {
       
       args = buildArgs([owner.address], [Remix1.address])
       
-      console.log("owner: ", owner.address, "Remix1: ", Remix1.address)
       Remix2 = await deployRemix(args); 
 
       const parents = await Remix2.getParents();
@@ -352,19 +351,104 @@ describe("Remix-NFT", function () {
     })
 
     describe("Flag", function () {
-      it("Should flag", async () => {
-        throw Error("Not yet implemented!")
+      beforeEach(async () => {
+        overrides = { value: utils.parseEther("0.1") }
+
+        args = buildArgs([owner.address])
+
+        Remix1 = await deployRemix(args);
+        await Remix1.connect(addr1).purchaseRMX(overrides)
+        args = buildArgs([addr1.address], [Remix1.address])
+
+        Remix2 = await deployRemix(args);
+        await Remix2.connect(addr2).purchaseRMX(overrides)
+
+        args = buildArgs([addr2.address], [Remix2.address])
+
+        Remix3 = await deployRemix(args);
       })
 
-      it("Should unflag", async () => {
-        throw Error("Not yet implemented!")
+      it("Should flag from first parent", async () => {
+        await Remix3.connect(addr1).flag([Remix3.address, Remix2.address])
+        expect(Remix3.isFlagged() == true, "The contract has not been flagged")
+      })
+
+      it("Should flag from any parent", async () => {
+        await Remix3.connect(owner).flag([Remix3.address, Remix2.address, Remix1.address])
+        expect(Remix3.isFlagged() == true, "The contract has not been flagged")
+      })
+
+      it("Should allow multiple flags", async () => {
+        await Remix3.connect(addr1).flag([Remix3.address, Remix2.address])
+        await Remix3.connect(owner).flag([Remix3.address, Remix2.address, Remix1.address])
+        expect(Remix3.isFlagged() == true, "The contract has not been flagged")
+        Remix3.connect(addr1).unflag([Remix3.address, Remix2.address], 0)
+        expect(Remix3.isFlagged() == true, "The contract should still be flagged")
+        Remix3.connect(owner).unflag([Remix3.address, Remix2.address, Remix1.address], 0)
+        expect(Remix3.isFlagged() == false, "The contract should not be flagged")
+      })
+
+      it("Should emit the Flag signal", async () => {
+        await expect(Remix3.connect(addr1).flag([Remix3.address, Remix2.address]))
+          .to.emit(Remix3, "Flagged").withArgs(addr1.address, Remix3.address)
+      })
+
+      it("Should only allow an author of a parent to flag", async () => {
+        await expect(Remix2.connect(addr2).flag([Remix2.address, Remix1.address]))
+          .to.be.reverted
+        expect(Remix2.isFlagged() == false, "The contract been flagged when it wasn't supposed to be!")
+      })
+    })
+
+    describe("UnFlag", function () {
+      beforeEach(async () => {
+        overrides = { value: utils.parseEther("0.1") }
+
+        args = buildArgs([owner.address])
+
+        Remix1 = await deployRemix(args);
+        await Remix1.connect(addr1).purchaseRMX(overrides)
+        args = buildArgs([addr1.address], [Remix1.address])
+
+        Remix2 = await deployRemix(args);
+        await Remix2.connect(addr2).purchaseRMX(overrides)
+
+        args = buildArgs([addr2.address], [Remix2.address])
+
+        Remix3 = await deployRemix(args);
+        await Remix2.connect(owner).flag([Remix2.address, Remix1.address])
+        await Remix3.connect(owner).flag([Remix3.address, Remix2.address, Remix1.address])
+      })
+
+      it ("Should unflag from a direct parent", async () => {
+        expect(Remix2.isFlagged() == true, "The starting contract has not been flagged")
+        Remix2.connect(owner).unflag([Remix2.address, Remix1.address], 0)
+        expect(Remix2.isFlagged() == false, "The contract has not been unflagged")
+      })
+
+      it("Should unflag from any parent", async () => {
+        expect(Remix3.isFlagged() == true, "The starting contract has not been flagged")
+        Remix3.connect(owner).unflag([Remix3.address, Remix2.address, Remix1.address], 0)
+        expect(Remix3.isFlagged() == false, "The contract has not been unflagged")
+      })
+
+      it("Should emit the UnFlag signal", async () => {
+        await expect(Remix2.connect(owner).unflag([Remix2.address, Remix1.address], 0))
+          .to.emit(Remix2, "UnFlagged").withArgs(owner.address, Remix2.address)
+      })
+
+      it("Should not allow a non parent to unflag", async () => {
+        expect(Remix3.isFlagged() == true, "The starting contract has not been flagged")
+        await expect(Remix2.connect(addr2).unflag([Remix2.address, Remix1.address], 0))
+          .to.be.reverted
       })
     })
   })
 
 
   describe("RemixFactory", function () {
-    let RemixFactoryFactory, RemixFactory, remixFactory;
+    let RemixFactoryFactory, RemixFactory, factory;
+    let Remix1, Remix2, Remix3;
 
     beforeEach(async () => {
       RemixFactoryFactory = await ethers.getContractFactory("RemixFactory");
@@ -372,31 +456,74 @@ describe("Remix-NFT", function () {
     })
 
     it("Should deploy the Remix Factory proxy contract", async function () {
-      remixFactory = await RemixFactoryFactory.deploy();
+      factory = await RemixFactoryFactory.deploy();
     });
+
+    describe("Flag", function () {
+      beforeEach(async () => {
+        factory = await RemixFactoryFactory.deploy();
+        args = buildArgs([addr1.address])
+        await factory.connect(addr1).deploy(...args);
+        events = await factory.queryFilter("RemixDeployed")
+        Remix1 = RemixFactory.attach(events[events.length - 1].args.contractAddress);
+      })
+
+      it("Should let the owner flag a remix", async () => {
+        factory.connect(owner).flag(Remix1.address)
+        expect(Remix1.isFlagged() == true, "The remix has not been flagged!")
+      })
+
+      it("Should only let the owner flag a remix", async () => {
+        await expect(factory.connect(addr1).flag(Remix1.address))
+          .to.be.reverted
+        expect(Remix1.isFlagged() == false, "The remix has not been flagged!")
+      })
+    })
+
+    describe("UnFlag", function () {
+      beforeEach(async () => {
+        factory = await RemixFactoryFactory.deploy();
+        args = buildArgs([addr1.address])
+        await factory.connect(addr1).deploy(...args);
+        events = await factory.queryFilter("RemixDeployed")
+        Remix1 = RemixFactory.attach(events[events.length - 1].args.contractAddress);
+        factory.flag(Remix1.address);
+      })
+
+      it("Should let the owner unflag a remix", async () => {
+        factory.connect(owner).unflag(Remix1.address, 0)
+        expect(Remix1.isFlagged() == false, "The remix has not been flagged!")
+      })
+
+      it("Should only let the owner unflag a remix", async () => {
+        await expect(factory.connect(addr1).unflag(Remix1.address, 0))
+          .to.be.reverted
+        expect(Remix1.isFlagged() == true, "The remix has been unflagged!")
+      })
+    })
 
     describe("deploy()", function () {
       beforeEach(async () => {
-        remixFactory = await RemixFactoryFactory.deploy();
+        factory = await RemixFactoryFactory.deploy();
       })
 
       it("Should be able to deploy a remix", async function () {
         args = buildArgs([owner.address])
-        await expect(remixFactory.deploy(...args))
-          .to.emit(remixFactory, 'RemixDeployed')
+        await expect(factory.deploy(...args))
+          .to.emit(factory, 'RemixDeployed')
       });
     });
 
     describe("getRemixByAuthor()", function () {
       beforeEach(async () => {
-        remixFactory = await RemixFactoryFactory.deploy();
+        factory = await RemixFactoryFactory.deploy();
       })
 
       it("Should return the contracts list for an author", async function () {
         args = buildArgs([owner.address])
-        const remix1 = await remixFactory.deploy(...args)
-        const remix2 = await remixFactory.deploy(...args)
-        const authors = await remixFactory.getRemixByAuthor(owner.address)
+        const remix1 = await factory.deploy(...args)
+        const remix2 = await factory.deploy(...args)
+        const authors = await factory.getRemixByAuthor(owner.address)
         expect(authors == [remix1.address, remix2.address])
       });
     });

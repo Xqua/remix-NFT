@@ -3,7 +3,13 @@ import { ConsoleSqlOutlined } from "@ant-design/icons";
 const { BufferList } = require("bl");
 // https://www.npmjs.com/package/ipfs-http-client
 const ipfsAPI = require("ipfs-http-client");
-export const ipfs = ipfsAPI({ host: "ipfs.infura.io", port: "5001", protocol: "https" });
+// export const ipfs = ipfsAPI({ host: "ipfs.infura.io", port: "5001", protocol: "https" });
+// const ipfsHost = "https://ipfs.io/ipfs/"
+
+export const ipfs = ipfsAPI({ host: "localhost", port: "5001", protocol: "http" });
+const ipfsHost = "http://localhost:8080/ipfs/"
+
+
 
 const { ethers, utils } = require("ethers");
 
@@ -20,7 +26,7 @@ const getFromIPFS = async hashToGet => {
 };
 
 const readJSONFromIPFS = async (uri) => {
-    const ipfsHash = uri.replace("https://ipfs.io/ipfs/", "");
+    const ipfsHash = uri.replace(ipfsHost, "");
     try {
         const jsonManifestBuffer = await getFromIPFS(ipfsHash);
         const jsonManifest = JSON.parse(jsonManifestBuffer.toString());
@@ -383,7 +389,7 @@ export class Remix {
             }
         }
         const hash = cid.toString();
-        this.uri = "https://ipfs.io/ipfs/" + hash + "/{id}.json";
+        this.uri = ipfsHost + hash + "/{id}.json";
         return (hash, this.uri);
     }
 

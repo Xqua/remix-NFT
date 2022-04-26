@@ -44,11 +44,23 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         require(finalized, "The contract has not been finalized!");
         _;
     }
-    
+
+    modifier isAuthor() {
+        bool author = false;
+        for (uint256 _i; _i < authors.length; _i++) {
+            if (authors[_i] == msg.sender) {
+                author = true;
+            }
+        }
+        require(author, "The sender is not an author!");
+        _;
+    }
+     
     enum TokenTypes {
         Collectible,
         Derivative,
-        Badge
+        Badge,
+        Flag
     }
 
     uint256 public royalties; /*Royalties for secondary sales of tokens*/
@@ -70,7 +82,12 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
     uint256[] public authorsSplits; /* List of authors splits */
     address[] public parents; /* List of authors splits */
     uint256[] public parentsSplits; /* List of authors splits */
-    address public currentCollectibleOwner;
+    address public currentCollectibleOwner; /* The current owner of the collectible */
+
+    address[] public flaggingParents;
+    mapping(address => bool) flaggingParentsExists;
+
+    address public remixFactory;
 
     // This field is essentialy an artificial representation of a token 
     address public currentRMXOwner;
@@ -92,8 +109,11 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
     event RoyaltyReceived(uint256 amount);
     event ParentAdded(address parent);
     event Mint(address dst, uint256 tokenID);
+    event Flagged(address by, address remix);
+    event UnFlagged(address by, address remix);
 
-    constructor(string memory uri_) ERC1155(uri_) {}
+    constructor(string memory uri_) ERC1155(uri_) {
+        }
 
     /// @dev Construtor sets the token base URI, and external interfaces
     /// @param uri_ String to prepend to token IDs
@@ -121,6 +141,8 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         require(_authors.length > 0, "There must be at least one author");
         require(_authors.length == _authorSplits.length, "!length"); /*Check input constraint*/
         require(_parents.length == _parentSplits.length, "!length"); /*Check input constraint*/
+
+        remixFactory = msg.sender;
 
         _setURI(uri_);
         authors = _authors;
@@ -237,6 +259,35 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         //_mint(msg.sender, uint256(TokenTypes.Derivative), 1, "");
     }
 
+    /// @dev Send a flag token to a child remix in case of unfair use or other complaints
+    /// @param _parents Addresses of a valid chain of parents, starting from this contract (element 0) all the way to the parent targetting 
+    function flag(address[] memory _parents) public {
+        if (msg.sender != remixFactory) {
+            requireIsParent(_parents);
+        }
+        if (!flaggingParentsExists[_parents[_parents.length -1]]) {
+            flaggingParents.push(_parents[_parents.length -1]);
+            flaggingParentsExists[_parents[_parents.length -1]] = true;
+        }
+        emit Flagged(msg.sender, address(this));
+    }
+
+    /// @dev Removes a flag token from a child remix in case of unfair use or other complaints
+    /// @param _parents Addresses of a valid chain of parents, starting from this contract (element 0) all the way to the parent targetting 
+    /// @param index index of the parent that has flagged this Remix 
+    function unflag(address[] memory _parents, uint256 index) public {
+        require(isFlagged(), "Cannot unflag a non flagged Remix");
+        if (msg.sender != remixFactory) {
+            requireIsParent(_parents);
+            require(flaggingParents[index] == _parents[_parents.length - 1], "The flagging parent must be the one calling unflag");
+        }
+        if (msg.sender == remixFactory) {
+            flaggingParents[index] = flaggingParents[flaggingParents.length - 1];
+            flaggingParents.pop();
+        }
+        emit UnFlagged(msg.sender, address(this));
+    }
+
     /// @dev Emit an event when ETH is received
     receive() external payable {
         emit RoyaltyReceived(msg.value);
@@ -280,16 +331,23 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         // TODO: find how to get the ERC20 received by this contract to add them here
     }
 
+    function isFlagged() public view returns(bool flagged) {
+        if (flaggingParents.length > 0) {
+            return true;
+        }
+        return false;
+    }
+
     function licenseActive(address _holder) public view returns (bool) {
-        bool isAuthor = false;
+        bool author = false;
         for (uint i = 0; i < authors.length; i++) {
             if (_holder == authors[i]) {
-                isAuthor = true;
+                author = true;
                 break;
             }
         }
         return
-            (isAuthor) ||
+            (author) ||
             (canMintUntil[_holder] > block.timestamp) ||
             (currentRMXOwner == _holder);
     }
@@ -325,6 +383,24 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
     function _mintCollectible(address _recipient) internal {
         _mint(_recipient, uint256(TokenTypes.Collectible), 1, "");
         emit Mint(_recipient, uint256(TokenTypes.Collectible));
+    }
+
+    function requireIsAuthorOf(address remix) internal view {
+        bool author = false;
+        address[] memory remixAuthors = Remix(payable(remix)).getAuthors();
+        for (uint256 _i; _i < remixAuthors.length; _i++) {
+            if (remixAuthors[_i] == msg.sender) {
+                author = true;
+            }
+        }
+        require(author, "The sender is not an author!");
+    }
+
+    function requireIsParent(address[] memory parentChain) internal view {
+        requireIsAuthorOf(parentChain[parentChain.length -1]);
+        for (uint256 _i = 0; _i < parentChain.length - 1; _i++) {
+            require(IERC1155(parentChain[_i + 1]).balanceOf(parentChain[_i], uint256(TokenTypes.Derivative)) == 1, "The address is not a child");
+        }
     }
 
     /// @dev Perform ETH splits
@@ -368,6 +444,7 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
             require(
                 to == address(0) ||
                     from == address(0) ||
+                    ids[_i] == uint256(TokenTypes.Flag) ||
                     ids[_i] == uint256(TokenTypes.Badge) ||
                     ids[_i] == uint256(TokenTypes.Collectible),
                 "!transferable"

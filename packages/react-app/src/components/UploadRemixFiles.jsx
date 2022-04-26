@@ -2,10 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Button, Divider, Row, Col, Spin, Card, Upload, Image } from 'antd'
 import { FileProtectOutlined, InboxOutlined, FileImageOutlined, FileZipFilled } from '@ant-design/icons';
 
-
 const { BufferList } = require('bl')
 const ipfsAPI = require('ipfs-http-client');
-const ipfs = ipfsAPI({host: 'ipfs.infura.io', port: '5001', protocol: 'https' });
+//const ipfs = ipfsAPI({ host: 'ipfs.infura.io', port: '5001', protocol: 'https' });
+//const ipfsHost = "https://ipfs.io/ipfs/"
+
+const ipfs = ipfsAPI({host: 'localhost', port: '5001', protocol: 'http' });
+const ipfsHost = "http://localhost:8080/ipfs/"
 
 const DEBUG = true;
 
@@ -25,17 +28,17 @@ export default function UploadRemixFiles(props) {
         if (result && result.path) {
             if (fileInfo.filename == "collectibleMedia") {
                 const c = { ...props.collectible };
-                c.image = "https://ipfs.io/ipfs/" + result.path;
+                c.image = ipfsHost + result.path;
                 props.setCollectible(c);
             }
             if (fileInfo.filename == "remixMedia") {
                 const r = { ...props.remix };
-                r.image = "https://ipfs.io/ipfs/" + result.path;
+                r.image = ipfsHost + result.path;
                 props.setRemix(r);
             }
             if (fileInfo.filename == "remixFiles") {
                 const r = { ...props.remix };
-                r.files = "https://ipfs.io/ipfs/" + result.path;
+                r.files = ipfsHost + result.path;
                 props.setRemix(r);
             }
             onSuccess("Ok!");

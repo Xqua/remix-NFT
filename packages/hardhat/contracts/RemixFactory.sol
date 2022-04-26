@@ -42,12 +42,13 @@ contract RemixFactory is Ownable {
         uint256 _collectiblePrice,
         uint256 _rmxCountdown,
         uint256 _royalties
-    ) public {
+    ) public returns (address) {
     isAuthor(_authors);
     address clone = Clones.clone(remixImplementation); 
     Remix(payable(clone)).initialize(_uri, _authors, _authorSplits, _parents, _parentSplits, _startingPrice, _increasePoints, _collectiblePrice, _rmxCountdown, _royalties);
     registerRemix(clone);
     emit RemixDeployed(_authors, clone);
+    return clone;
   }
 
   function registerRemix(address contractAddress) public {
@@ -72,6 +73,26 @@ contract RemixFactory is Ownable {
       }
     }
     require(isSendAuthor, "The sender is not an author!");
+  }
+
+  function harvestMany(address[] memory _remixes, address _tokenAddress) public {
+    for (uint256 _i = 0; _i < _remixes.length; _i++) {
+      Remix(payable(_remixes[_i])).harvestRoyalties(_tokenAddress);
+    }
+  }
+
+  function flag(address remixAddress) public onlyOwner {
+    address[] memory args = new address[](2);
+    args[0] = remixAddress;
+    args[1] = address(this);
+    Remix(payable(remixAddress)).flag(args);
+  }
+
+  function unflag(address remixAddress, uint256 index) public onlyOwner {
+    address[] memory args = new address[](2);
+    args[0] = remixAddress;
+    args[1] = address(this);
+    Remix(payable(remixAddress)).unflag(args, index);
   }
 
    //TODO probably add moderation functionality

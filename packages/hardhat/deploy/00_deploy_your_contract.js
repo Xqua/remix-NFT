@@ -1,8 +1,10 @@
 // deploy/00_deploy_your_contract.js
 const ipfsAPI = require('ipfs-http-client');
 const { globSource } = require('ipfs-http-client')
-const ipfs = ipfsAPI({host: 'ipfs.infura.io', port: '5001', protocol: 'https' })
-
+// const ipfs = ipfsAPI({ host: 'ipfs.infura.io', port: '5001', protocol: 'https' })
+// const ipfsHost = "https://ipfs.io/ipfs/"
+const ipfs = ipfsAPI({ host: '127.0.0.1', port: '5001', protocol: 'http' })
+const ipfsHost = "http://localhost:8080/ipfs/"
 const { utils } = require("ethers");
 
 const buildArgs = (authors, parents = [], tokenURI = null) => {
@@ -42,9 +44,9 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   // First, we upload the metadata to IPFS and get the CID  
   const file = await ipfs.add(globSource("./RMXMetadata", { recursive: true }))
   console.log(file.cid.toString());
-  const tokenUri_1 = "https://ipfs.io/ipfs/" + file.cid.toString() + "/RMX_1_{id}.json"
-  const tokenUri_2 = "https://ipfs.io/ipfs/" + file.cid.toString() + "/RMX_2_{id}.json"
-  const tokenUri_3 = "https://ipfs.io/ipfs/" + file.cid.toString() + "/RMX_3_{id}.json"
+  const tokenUri_1 = ipfsHost + file.cid.toString() + "/RMX_1_{id}.json"
+  const tokenUri_2 = ipfsHost + file.cid.toString() + "/RMX_2_{id}.json"
+  const tokenUri_3 = ipfsHost + file.cid.toString() + "/RMX_3_{id}.json"
 
   console.log(tokenUri_1);
 

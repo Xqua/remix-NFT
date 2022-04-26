@@ -4,14 +4,18 @@ const { clearLine } = require("readline");
 
 const { globSource } = ipfsAPI;
 
-const infura = { host: "ipfs.infura.io", port: "5001", protocol: "https" };
+// Using infura
+// const infura = { host: "ipfs.infura.io", port: "5001", protocol: "https" };
+// const ipfs = ipfsAPI(infura);
+
+// const ipfsGateway = "https://ipfs.io/ipfs/";
+// const ipnsGateway = "https://ipfs.io/ipns/";
 // run your own ipfs daemon: https://docs.ipfs.io/how-to/command-line-quick-start/#install-ipfs
 const localhost = { host: "localhost", port: "5001", protocol: "http" };
+const ipfs = ipfsAPI(localhost);
 
-const ipfs = ipfsAPI(infura);
-
-const ipfsGateway = "https://ipfs.io/ipfs/";
-const ipnsGateway = "https://ipfs.io/ipns/";
+const ipfsGateway = "http://localhost:8080/ipfs/";
+const ipnsGateway = "http://localhost:8080/ipns/";
 
 const addOptions = {
   pin: true,
