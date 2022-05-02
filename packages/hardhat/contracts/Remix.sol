@@ -55,7 +55,7 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         require(author, "The sender is not an author!");
         _;
     }
-     
+
     enum TokenTypes {
         Collectible,
         Derivative,
@@ -80,12 +80,12 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
 
     address[] public authors; /* List of authors */
     uint256[] public authorsSplits; /* List of authors splits */
-    address[] public parents; /* List of authors splits */
-    uint256[] public parentsSplits; /* List of authors splits */
+    address[] public parents; /* List of parents splits */
+    uint256[] public parentsSplits; /* List of parents splits */
     address public currentCollectibleOwner; /* The current owner of the collectible */
 
     address[] public flaggingParents;
-    mapping(address => bool) flaggingParentsExists;
+    mapping(address => bool) public flaggingParentsExists;
 
     address public remixFactory;
 
@@ -263,7 +263,7 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
     /// @param _parents Addresses of a valid chain of parents, starting from this contract (element 0) all the way to the parent targetting 
     function flag(address[] memory _parents) public {
         if (msg.sender != remixFactory) {
-            requireIsParent(_parents);
+            requireIsValidParentsChain(_parents);
         }
         if (!flaggingParentsExists[_parents[_parents.length -1]]) {
             flaggingParents.push(_parents[_parents.length -1]);
@@ -277,14 +277,13 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
     /// @param index index of the parent that has flagged this Remix 
     function unflag(address[] memory _parents, uint256 index) public {
         require(isFlagged(), "Cannot unflag a non flagged Remix");
+
         if (msg.sender != remixFactory) {
-            requireIsParent(_parents);
-            require(flaggingParents[index] == _parents[_parents.length - 1], "The flagging parent must be the one calling unflag");
+            requireIsValidParentsChain(_parents);
         }
-        if (msg.sender == remixFactory) {
-            flaggingParents[index] = flaggingParents[flaggingParents.length - 1];
-            flaggingParents.pop();
-        }
+        require(flaggingParents[index] == _parents[_parents.length - 1], "The flagging parent must be the one calling unflag");
+        flaggingParents[index] = flaggingParents[flaggingParents.length - 1];
+        flaggingParents.pop();
         emit UnFlagged(msg.sender, address(this));
     }
 
@@ -329,6 +328,10 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         values[0] = address(this).balance;
         return (tokenAddresses, values);
         // TODO: find how to get the ERC20 received by this contract to add them here
+    }
+
+    function getFlaggingParents() public view returns(address[] memory) {
+        return flaggingParents;
     }
 
     function isFlagged() public view returns(bool flagged) {
@@ -396,7 +399,7 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         require(author, "The sender is not an author!");
     }
 
-    function requireIsParent(address[] memory parentChain) internal view {
+    function requireIsValidParentsChain(address[] memory parentChain) internal view {
         requireIsAuthorOf(parentChain[parentChain.length -1]);
         for (uint256 _i = 0; _i < parentChain.length - 1; _i++) {
             require(IERC1155(parentChain[_i + 1]).balanceOf(parentChain[_i], uint256(TokenTypes.Derivative)) == 1, "The address is not a child");

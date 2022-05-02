@@ -5,29 +5,35 @@ import React, { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Link, Route, Switch } from "react-router-dom";
 import Web3Modal from "web3modal";
 import "./App.css";
-import { Account, Contract, Faucet, GasGauge, Header, Ramp, ThemeSwitch, RemixDeploy, RemixContainer, RemixCardList } from "./components";
+import { 
+  Account, 
+  Contract, 
+  Faucet, 
+  GasGauge, 
+  Header, 
+  Ramp, 
+  ThemeSwitch, 
+  RemixDeploy, 
+  RemixCardList,
+  RemixGraph
+} from "./components";
 import {INFURA_ID, NETWORK, NETWORKS } from "./constants";
 import { Transactor } from "./helpers";
 import {
   useBalance,
   useContractLoader,
   useContractReader,
-  useEventListener,
   useExchangePrice,
   useGasPrice,
   useOnBlock,
   useUserSigner,
   useRemix,
   useAddressRemixes,
+  useRemixGraph
 } from "./hooks";
 import { RemixContext, RemixFactory } from "./helpers";
 
 const { Content } = Layout;
-
-const { BufferList } = require("bl");
-// https://www.npmjs.com/package/ipfs-http-client
-const ipfsAPI = require("ipfs-http-client");
-const ipfs = ipfsAPI({ host: "ipfs.infura.io", port: "5001", protocol: "https" });
 
 const { ethers } = require("ethers");
 
@@ -56,28 +62,6 @@ const targetNetwork = NETWORKS.localhost; // <------- select your target fronten
 // 😬 Sorry for all the console logging
 const DEBUG = true;
 const NETWORKCHECK = false;
-
-// EXAMPLE STARTING JSON:
-const STARTING_JSON = {
-  description: "It's actually a bison?",
-  external_url: "https://austingriffith.com/portfolio/paintings/", // <-- this can link to a page for the specific file too
-  image: "https://austingriffith.com/images/paintings/buffalo.jpg",
-  name: "Buffalo",
-  attributes: [
-    {
-      trait_type: "BackgroundColor",
-      value: "green",
-    },
-    {
-      trait_type: "Eyes",
-      value: "googly",
-    },
-  ],
-};
-
-// helper function to "Get" from IPFS
-// you usually go content.toString() after this...
-
 
 // 🛰 providers
 if (DEBUG) console.log("📡 Connecting to Mainnet Ethereum");
@@ -197,11 +181,11 @@ function App(props) {
   
   const remixContracts = useRemix(remixFactory, userSigner)
   const myRemixContracts = useAddressRemixes(remixFactory, address)
+  const graph = useRemixGraph(remixFactory)
 
   useEffect(() => {
     if (writeContracts && writeContracts["RemixFactory"] && userSigner) {
       const factory = new RemixFactory(writeContracts["RemixFactory"].address, userSigner)
-      //console.log("->>>>>>FACTORY", factory)
       setRemixFactory(factory)
     } 
   }, [writeContracts, userSigner])
@@ -215,6 +199,22 @@ function App(props) {
     remixContext.selectedContract = selectedContract;
     setRemixContext(remixContext)
   }, [selectedContract])
+
+  useEffect(() => {
+    remixContext.graph = graph;
+    setRemixContext(remixContext)
+  }, [graph])
+
+  useEffect(() => {
+    remixContext.remixFactory = remixFactory;
+    setRemixContext(remixContext)
+  }, [remixFactory])
+
+  useEffect(() => {
+    remixContext.myRemixContracts = myRemixContracts;
+    setRemixContext(remixContext)
+  }, [myRemixContracts])
+
 
   //
   // 🧫 DEBUG 👨🏻‍🔬
@@ -367,16 +367,6 @@ function App(props) {
     );
   }
 
-  const [yourJSON, setYourJSON] = useState(STARTING_JSON);
-  const [sending, setSending] = useState();
-  const [ipfsHash, setIpfsHash] = useState();
-  const [ipfsDownHash, setIpfsDownHash] = useState();
-
-  const [downloading, setDownloading] = useState();
-  const [ipfsContent, setIpfsContent] = useState();
-
-  const [transferToAddresses, setTransferToAddresses] = useState({});
-
   useEffect(() => {
     if (remixContracts) setSelectedContract((Object.keys(remixContracts)[0]))
   }, [remixContracts])
@@ -399,16 +389,26 @@ function App(props) {
               Explore
             </Link>
           </Menu.Item>
-            <Menu.Item key="/mine">
-              <Link
-                onClick={() => {
-                  setRoute("/mine");
-                }}
-                to="/mine"
-              >
-                My Remixes
-              </Link>
-            </Menu.Item>
+          <Menu.Item key="/graph">
+            <Link
+              onClick={() => {
+                setRoute("/graph");
+              }}
+              to="/graph"
+            >
+              Explore
+            </Link>
+          </Menu.Item>
+          <Menu.Item key="/mine">
+            <Link
+              onClick={() => {
+                setRoute("/mine");
+              }}
+              to="/mine"
+            >
+              My Remixes
+            </Link>
+          </Menu.Item>
           <Menu.Item key="/mint">
             <Link
               onClick={() => {
@@ -431,7 +431,7 @@ function App(props) {
           </Menu.Item>
         </Menu>
 
-        <Content style={{ margin: 'auto', maxWidth: 1200}}>
+        <Content style={{ margin: 'auto', maxWidth: 1200, marginTop: '20px'}}>
           <Switch>
             <Route exact path="/">
               <RemixCardList
@@ -440,13 +440,18 @@ function App(props) {
                   setRoute={setRoute}
                 />
             </Route>
-              <Route exact path="/mine">
-                <RemixCardList
-                  remixContracts={remixContracts ? myRemixContracts.map(contract => remixContracts[contract]) : []}
-                  setSelectedContract={setSelectedContract}
-                  setRoute={setRoute}
-                />
-              </Route>
+            <Route exact path="/graph">
+              <RemixGraph
+                remixFactory={remixFactory}
+              />
+            </Route>
+            <Route exact path="/mine">
+              <RemixCardList
+                remixContracts={remixContracts ? myRemixContracts.map(contract => remixContracts[contract]) : []}
+                setSelectedContract={setSelectedContract}
+                setRoute={setRoute}
+              />
+            </Route>
             <Route path="/mint">
               <RemixDeploy
                 address={address}

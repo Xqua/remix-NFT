@@ -1,7 +1,7 @@
 import React, {useState, useEffect } from "react";
 import { useHistory } from "react-router-dom";
-import { Divider, Card, Row, Col, Statistic, Image, Skeleton, Modal, Space } from 'antd';
-import { DollarOutlined, ShareAltOutlined, FileImageOutlined, EditOutlined } from '@ant-design/icons';
+import { Divider, Card, Row, Col, Statistic, Image, Skeleton, Modal } from 'antd';
+import { DollarOutlined, FileImageOutlined, EditOutlined } from '@ant-design/icons';
 import Blockies from "react-blockies";
 import { BuyNFTButton, BuyRMXButton, RemixContainer } from "."
 
@@ -11,15 +11,9 @@ export default function RemixCard(props) {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isBuyModalVisible, setIsBuyModalVisible] = useState(false);
     
-    //const writeContract = useContractLoader(props.signer, { chainId: props.localChainId, customAddresses: { "Remix": remix.address } }); 
-
     useEffect(() => {
         setRemix(props.remix)
-    }, [props.remix])
-
-    useEffect(() => {
-        setRemix(props.remix)
-    }, [props.remix.state])
+    }, [props.remix, props.remix.state])
 
     const { Meta } = Card;
 
@@ -57,7 +51,6 @@ export default function RemixCard(props) {
                 </Col>
             </Row>
             <Modal
-                forceRender={true}
                 title={remix?.CollectibleMetadata?.name}
                 visible={isModalVisible}
                 onOk={() => setIsModalVisible(false)}
@@ -67,7 +60,6 @@ export default function RemixCard(props) {
                 <RemixContainer remix={remix} />
             </Modal>
             <Modal 
-                forceRender={true}
                 title="Buy this Remix" 
                 visible={isBuyModalVisible}
                 onOk={() => setIsBuyModalVisible(false)}

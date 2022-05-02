@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext } from "react";
 import {Row, Col, Card, Collapse, Skeleton, Image, List, Button, Space, Divider} from "antd";
-import { FileImageFilled, FileZipFilled, EditOutlined } from "@ant-design/icons";
+import { FileImageFilled, FileZipFilled } from "@ant-design/icons";
 import Blockies from "react-blockies";
-import { RemixListItem, RemixActivity, BuyNFTButton, BuyRMXButton, RemixValueHeld } from ".";
+import { RemixListItem, RemixActivity, BuyNFTButton, BuyRMXButton, RemixValueHeld, RemixFlagButton } from ".";
 import { RemixContext } from "../helpers"
 
 export default function RemixContainer(props) {
@@ -20,11 +20,9 @@ export default function RemixContainer(props) {
     }
 
     const [remixContext, setRemixContext] = useContext(RemixContext);
-    //console.log(remixContext)
     useEffect(() => {
         updateMetadata();
-        //console.log("Remix updated!", props.remix)
-    }, [props.remix?.state])
+    }, [props.remix, props.remix?.state])
 
     useEffect(() => { 
         updateMetadata();
@@ -136,6 +134,7 @@ export default function RemixContainer(props) {
                 <Space>
                     <BuyNFTButton remix={props.remix} type="primary" /> 
                     <BuyRMXButton remix={props.remix} type="primary" />
+                    <RemixFlagButton remix={props.remix} type="primary" />
                 </Space>
                 <Divider />
                 <RemixValueHeld remix={props.remix}/>

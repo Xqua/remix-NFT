@@ -1,16 +1,9 @@
-import { notification, Spin, Modal, Typography, Collapse, Button, Form, Input, InputNumber, List, Avatar, Row, Col, Divider, Result } from "antd";
+import { notification, Spin, Modal, Typography, Collapse, Button, Form, Input, InputNumber, List, Row, Col, Divider, Result } from "antd";
 import React, {useState, useEffect } from "react";
-import { FileImageOutlined, SettingOutlined, EditOutlined, UserAddOutlined, UserDeleteOutlined, DeleteOutlined } from '@ant-design/icons';
+import { UserAddOutlined } from '@ant-design/icons';
 import { UploadRemixFiles, ParentSplitField, AddressField, RemixListItem } from ".";
 import { Remix } from "../helpers";
 import { useHistory } from "react-router-dom";
-
-const { BufferList } = require('bl')
-const ipfsAPI = require('ipfs-http-client');
-const ipfs = ipfsAPI({ host: 'ipfs.infura.io', port: '5001', protocol: 'https' });
-
-const { ethers, utils } = require("ethers");
-
 
 
 // @props.address: The address of the person logged in
@@ -47,30 +40,6 @@ export default function RemixDeploy(props) {
     const newParents = parents.map((parent, key) => { parent.key = key; return parent });
     setParents(newParents);
   }
-
-  const makeAuthorsFields = () => {
-    let newAddressFields = authors.map((author) => (
-      <AddressField
-        key={author.key}
-        author={author}
-        onDelete={(author) => { authors.splice(author.key); updateAuthors(authors); }}
-        onChange={(author) => { authors[author.key] = author; setAuthors(authors); updateSplitSum(); }}
-      />
-      )
-    )
-    setAddressFields(newAddressFields)
-  }
-
-  const makeParentsSplitFields = () => {
-    let newParentSplitFields = parents.map((parent) => (
-      <ParentSplitField 
-        parent={parent}
-        onDelete={(parent) => {parents.splice(parent.key); updateParents(parents)}}
-        onChange={(parent) => {parents[parent.key] = parent; setParents(parents); updateSplitSum();}}
-      />
-    ))
-    setParentsSplitFields(newParentSplitFields);
-  }
  
   useEffect(() => {
     if (props.address) {
@@ -83,11 +52,33 @@ export default function RemixDeploy(props) {
   }, [props.address])
 
   useEffect(() => {
+    const makeParentsSplitFields = () => {
+      let newParentSplitFields = parents.map((parent) => (
+        <ParentSplitField
+          parent={parent}
+          onDelete={(parent) => { parents.splice(parent.key); updateParents(parents) }}
+          onChange={(parent) => { parents[parent.key] = parent; setParents(parents); updateSplitSum(); }}
+        />
+      ))
+      setParentsSplitFields(newParentSplitFields);
+    }
     makeParentsSplitFields();
     updateSplitSum();
   }, [parents])
 
   useEffect(() => {
+    const makeAuthorsFields = () => {
+      let newAddressFields = authors.map((author) => (
+        <AddressField
+          key={author.key}
+          author={author}
+          onDelete={(author) => { authors.splice(author.key); updateAuthors(authors); }}
+          onChange={(author) => { authors[author.key] = author; setAuthors(authors); updateSplitSum(); }}
+        />
+      )
+      )
+      setAddressFields(newAddressFields)
+    }
     makeAuthorsFields();
     updateSplitSum();
   }, [authors])
@@ -182,7 +173,6 @@ export default function RemixDeploy(props) {
         name="DeployContract"
         labelCol={{ span: 4 }}
         wrapperCol={{ span: 20 }}
-        initialValues={{ remember: true }}
         onFinish={onFinish}
         onFinishFailed={onFinishFailed}
         autoComplete="off"

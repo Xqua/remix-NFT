@@ -28,7 +28,7 @@ const buildArgs = (authors, parents = []) => {
     100, // uint256 _increasePoints,
     utils.parseEther("0.1"), // uint256 _collectiblePrice,
     10000, // uint256 _rmxCountdown,
-    100] // uint256 _royalties
+    1000] // uint256 _royalties
   return args;
 } 
 
@@ -120,18 +120,21 @@ describe("Remix-NFT", function () {
       Remix2 = await deployRemix(args); 
 
       const parents = await Remix2.getParents();
-      expect(parents == [Remix1.address], "Contract did not save the parents")
+      expect(parents, "Contract did not save the parents").to.eql([Remix1.address])
       events = await Remix1.queryFilter("DerivativeIssued")
-      expect(events.length == 1, "DerivativeIssue events missing")
+      expect(events, "DerivativeIssue events missing").to.have.length(1);
     })
 
     it("Should emit the correct events on initialize", async function () {
       const args = buildArgs([owner.address])
 
-      Remix1 = await deployRemix(args); 
+      Remix1 = await RemixFactory.deploy("")
+      await expect(Remix1.initialize(...args), "Did not emit finalize!")
+        .to.emit(Remix1, "Finalized")
+        .withArgs([owner.address], true)
 
       events = await Remix1.queryFilter("Finalized")
-      expect(events.length == 1, "Finalized event number is not correct")
+      expect(events.length, "Finalized event number is not correct").to.eql(1)
     })
 
     it("Should require the RMX token", async () => {
@@ -186,15 +189,25 @@ describe("Remix-NFT", function () {
       it("Should purchase the Collectible", async function () {
         overrides = { value: utils.parseEther("0.1") }
 
+        await Remix1.connect(addr1).purchaseCollectible(overrides)
+        
+        expect(await Remix1.balanceOf(addr1.address, 0), "Collectible was not sent!").to.equal(1)
+      })
+
+      it ("Should emit the Collectible Purchased event", async function () {
+        overrides = { value: utils.parseEther("0.1") }
+
         await expect(Remix1.connect(addr1).purchaseCollectible(overrides))
           .to.emit(Remix1, "CollectiblePurchased")
           .withArgs(addr1.address, utils.parseEther("0.1"))
+      })
 
-        events = await Remix1.queryFilter("Mint")
-        expect(events.pop().args.tokenID == 1, "Collectible mint event not sent")
+      it ("Should emit the Mint event", async function () {
+        overrides = { value: utils.parseEther("0.1") }
 
-        expect(Remix1.balanceOf(owner.address, 1) == 0, "Owner still has collectible!")
-        expect(Remix1.balanceOf(addr1.address, 1) == 1, "Collectible was not sent!")
+        await expect(Remix1.connect(addr1).purchaseCollectible(overrides))
+          .to.emit(Remix1, "Mint")
+          .withArgs(addr1.address, 0)
       })
 
       it("Should fail if not enough value", async function () {
@@ -224,43 +237,47 @@ describe("Remix-NFT", function () {
       })
 
       it("Should have Eth in contracts", async () => {
-        expect(await ethers.provider.getBalance(Remix1.address) == utils.parseEther("0.2"), "Remix1 does not have funds")
-        expect(await ethers.provider.getBalance(Remix2.address) == utils.parseEther("0.2"), "Remix2 does not have funds")
-        expect(await ethers.provider.getBalance(Remix3.address) == utils.parseEther("0.2"), "Remix3 does not have funds")
+        expect(await ethers.provider.getBalance(Remix1.address), "Remix1 does not have funds").to.equal(utils.parseEther("0.2"))
+        expect(await ethers.provider.getBalance(Remix2.address), "Remix2 does not have funds").to.equal(utils.parseEther("0.2"))
+        expect(await ethers.provider.getBalance(Remix3.address), "Remix3 does not have funds").to.equal(utils.parseEther("0.2"))
       })
 
       it("Should harvest to one authors", async () => {
+        const royalties = await ethers.provider.getBalance(Remix1.address);
         const before = await ethers.provider.getBalance(owner.address);
-        await Remix1.harvestRoyalties(addressZero)
+        await Remix1.connect(addr1).harvestRoyalties(addressZero)
         const after = await ethers.provider.getBalance(owner.address);
-        expect(after - before == parseInt(utils.parseEther("0.2")._hex, 16), "Owner did not receive funds")
+        expect(after.sub(before), "Owner did not receive funds").to.equal(royalties)
       })
 
       it("Should harvest to multiple authors", async () => {
+        const royalties = await ethers.provider.getBalance(Remix3.address);
         const beforeOwner = await ethers.provider.getBalance(owner.address);
         const beforeAddr1 = await ethers.provider.getBalance(addr1.address);
-        await Remix3.harvestRoyalties(addressZero)
+        await Remix3.connect(addr2).harvestRoyalties(addressZero)
         const afterOwner = await ethers.provider.getBalance(owner.address);
         const afterAddr1 = await ethers.provider.getBalance(addr1.address);
-        expect(afterOwner - beforeOwner == parseInt(utils.parseEther("0.05")._hex, 16), "Owner did not receive funds")
-        expect(afterAddr1 - beforeAddr1 == parseInt(utils.parseEther("0.05")._hex, 16), "Addr1 did not receive funds")
+        expect(afterOwner.sub(beforeOwner), "Owner did not receive funds").to.equal(royalties.div(4))
+        expect(afterAddr1.sub(beforeAddr1), "Addr1 did not receive funds").to.equal(royalties.div(4))
       })
 
       it("Should harvest and send up the chain once", async () => {
+        const royalties = await ethers.provider.getBalance(Remix1.address);
         const before = await ethers.provider.getBalance(Remix1.address);
         await Remix2.harvestRoyalties(addressZero)
         const after = await ethers.provider.getBalance(Remix1.address);
-        expect(after - before == parseInt(utils.parseEther("0.1")._hex, 16), "Remix1 did not receive funds")
+        expect(after.sub(before), "Remix1 did not receive funds").to.equal(royalties.div(2))
       })
 
       it("Should harvest and send up the chain to all parents", async () => {
+        const royalties = await ethers.provider.getBalance(Remix3.address);
         const beforeRemix1 = await ethers.provider.getBalance(Remix1.address);
         const beforeRemix2 = await ethers.provider.getBalance(Remix2.address);
-        await Remix2.harvestRoyalties(addressZero)
+        await Remix3.harvestRoyalties(addressZero)
         const afterRemix1 = await ethers.provider.getBalance(Remix1.address);
         const afterRemix2 = await ethers.provider.getBalance(Remix1.address);
-        expect(afterRemix1 - beforeRemix1 == parseInt(utils.parseEther("0.05")._hex, 16), "Remix1 did not receive funds")
-        expect(afterRemix2 - beforeRemix2 == parseInt(utils.parseEther("0.05")._hex, 16), "Remix1 did not receive funds")
+        expect(afterRemix1.sub(beforeRemix1), "Remix1 did not receive funds").to.equal(royalties.div(4))
+        expect(afterRemix2.sub(beforeRemix2), "Remix2 did not receive funds").to.equal(royalties.div(4))
       })
 
       it("Should work for ERC20", async () => {
@@ -284,9 +301,8 @@ describe("Remix-NFT", function () {
       it("Should give the correct royalty info", async () => {
         value = utils.parseEther("1");
         const royaltyInfo = await Remix1.royaltyInfo(0, value)
-        expect(royaltyInfo.receiver == Remix1.address, "Receiver address is not correct")
-        expect(royaltyInfo.royaltyAmount == utils.parseEther("0.1"), "Royalties amount is not correct")
-
+        expect(royaltyInfo.receiver, "Receiver address is not correct").to.equal(Remix1.address)
+        expect(royaltyInfo.royaltyAmount, "Royalties amount is not correct").to.equal(utils.parseEther("0.1"))
       })
 
       it("Should throw a wrong token ID if not collectible", async () => {
@@ -303,9 +319,9 @@ describe("Remix-NFT", function () {
         Remix1 = await deployRemix(args);
       })
 
-      it("Should give the correct authors string", async () => {
+      it("Should give the correct authors array", async () => {
         const authorsRemix1 = await Remix1.getAuthors();
-        expect(authorsRemix1 == [owner.address, addr1.address], "Authors are not correct")
+        expect(authorsRemix1, "Authors are not correct").to.eql([owner.address, addr1.address])
       })
     })
 
@@ -319,9 +335,9 @@ describe("Remix-NFT", function () {
         Remix2 = await deployRemix(args);
       })
 
-      it("Should give the correct authors string", async () => {
+      it("Should give the correct parents array", async () => {
         const parentsRemix1 = await Remix2.getParents();
-        expect(parentsRemix1 == [Remix1.address], "Parents are not correct")
+        expect(parentsRemix1, "Parents are not correct").to.eql([Remix1.address])
       })
     })
 
@@ -334,19 +350,19 @@ describe("Remix-NFT", function () {
 
       it("Should be a valid licence is this is the author", async () => {
         const licence = await Remix1.licenseActive(owner.address);
-        expect(licence == true, "Authors does not have the licence!")
+        expect(licence == true, "Authors does not have the licence!").to.be.true
       })
 
       it("Should be invalid licence is this is not the author", async () => {
         const licence = await Remix1.licenseActive(addr1.address);
-        expect(licence == false, "Stranger has the licence without the RMX or being author!")
+        expect(licence == false, "Stranger has the licence without the RMX or being author!").to.be.true
       })
 
       it("Should be valid if the address owns an RMX token", async () => {
         overrides = { value: utils.parseEther("0.1")}
         await Remix1.connect(addr1).purchaseRMX(overrides)
         const licence = await Remix1.licenseActive(addr1.address);
-        expect(licence == true, "Owner of RMX does not have the licence!")
+        expect(licence == true, "Owner of RMX does not have the licence!").to.be.true
       })
     })
 
@@ -370,22 +386,34 @@ describe("Remix-NFT", function () {
 
       it("Should flag from first parent", async () => {
         await Remix3.connect(addr1).flag([Remix3.address, Remix2.address])
-        expect(Remix3.isFlagged() == true, "The contract has not been flagged")
+        expect(await Remix3.isFlagged(), "The contract has not been flagged").to.be.true
       })
 
       it("Should flag from any parent", async () => {
         await Remix3.connect(owner).flag([Remix3.address, Remix2.address, Remix1.address])
-        expect(Remix3.isFlagged() == true, "The contract has not been flagged")
+        expect(await Remix3.isFlagged(), "The contract has not been flagged").to.be.true
+      })
+
+      it("Should register the flagging parent in mapping", async () => {
+        await Remix3.connect(addr1).flag([Remix3.address, Remix2.address])
+        expect(await Remix3.flaggingParentsExists(Remix2.address), "The contract has not been flagged").to.be.true
+        expect(await Remix3.getFlaggingParents()).to.be.an('array').that.include(Remix2.address);
       })
 
       it("Should allow multiple flags", async () => {
         await Remix3.connect(addr1).flag([Remix3.address, Remix2.address])
+        expect(await Remix3.isFlagged(), "The contract has not been flagged").to.be.true
+        
         await Remix3.connect(owner).flag([Remix3.address, Remix2.address, Remix1.address])
-        expect(Remix3.isFlagged() == true, "The contract has not been flagged")
-        Remix3.connect(addr1).unflag([Remix3.address, Remix2.address], 0)
-        expect(Remix3.isFlagged() == true, "The contract should still be flagged")
-        Remix3.connect(owner).unflag([Remix3.address, Remix2.address, Remix1.address], 0)
-        expect(Remix3.isFlagged() == false, "The contract should not be flagged")
+        expect(await Remix3.isFlagged(), "The contract has not been flagged").to.be.true
+
+        expect(await Remix3.getFlaggingParents()).to.be.an('array').that.eql([Remix2.address, Remix1.address]);
+
+        await Remix3.connect(addr1).unflag([Remix3.address, Remix2.address], 0)
+        expect(await Remix3.isFlagged(), "The contract should still be flagged").to.be.true
+
+        await Remix3.connect(owner).unflag([Remix3.address, Remix2.address, Remix1.address], 0)
+        expect(await Remix3.isFlagged(), "The contract should not be flagged").to.be.false
       })
 
       it("Should emit the Flag signal", async () => {
@@ -396,7 +424,8 @@ describe("Remix-NFT", function () {
       it("Should only allow an author of a parent to flag", async () => {
         await expect(Remix2.connect(addr2).flag([Remix2.address, Remix1.address]))
           .to.be.reverted
-        expect(Remix2.isFlagged() == false, "The contract been flagged when it wasn't supposed to be!")
+        expect(await Remix2.isFlagged(), "The contract been flagged when it wasn't supposed to be!")
+          .to.be.false
       })
     })
 
@@ -405,31 +434,52 @@ describe("Remix-NFT", function () {
         overrides = { value: utils.parseEther("0.1") }
 
         args = buildArgs([owner.address])
-
         Remix1 = await deployRemix(args);
         await Remix1.connect(addr1).purchaseRMX(overrides)
-        args = buildArgs([addr1.address], [Remix1.address])
 
+        args = buildArgs([addr1.address], [Remix1.address])
         Remix2 = await deployRemix(args);
         await Remix2.connect(addr2).purchaseRMX(overrides)
 
         args = buildArgs([addr2.address], [Remix2.address])
-
         Remix3 = await deployRemix(args);
+
         await Remix2.connect(owner).flag([Remix2.address, Remix1.address])
+        await Remix3.connect(owner).flag([Remix3.address, Remix2.address])
         await Remix3.connect(owner).flag([Remix3.address, Remix2.address, Remix1.address])
       })
 
       it ("Should unflag from a direct parent", async () => {
-        expect(Remix2.isFlagged() == true, "The starting contract has not been flagged")
-        Remix2.connect(owner).unflag([Remix2.address, Remix1.address], 0)
-        expect(Remix2.isFlagged() == false, "The contract has not been unflagged")
+        expect(await Remix2.isFlagged(), "The starting contract has not been flagged").to.be.true
+        await Remix2.connect(owner).unflag([Remix2.address, Remix1.address], 0)
+        expect(await Remix2.isFlagged(), "The contract has not been unflagged").to.be.false
       })
 
       it("Should unflag from any parent", async () => {
-        expect(Remix3.isFlagged() == true, "The starting contract has not been flagged")
-        Remix3.connect(owner).unflag([Remix3.address, Remix2.address, Remix1.address], 0)
-        expect(Remix3.isFlagged() == false, "The contract has not been unflagged")
+        expect(await Remix3.isFlagged(), "The starting contract has not been flagged").to.be.true
+        expect(await Remix3.getFlaggingParents(), "The parent is not flagging to begingin with!")
+          .to.be.an('array').that.include(Remix1.address);
+        await Remix3.connect(owner).unflag([Remix3.address, Remix2.address, Remix1.address], 1)
+        expect(await Remix3.getFlaggingParents(), "The parent has not been removed from the flaggers")
+          .to.be.an('array').that.does.not.include(Remix1.address);
+      })
+
+      it("Should verify that the parent chain is valid", async () => {
+        await expect(Remix3.connect(addr2).unflag([Remix3.address, Remix1.address, Remix2.address], 0))
+          .to.be.reverted
+      })
+
+      it("Should verifiy the that the index corresponds to the correct parent", async () => {
+        await expect(Remix3.connect(owner).unflag([Remix3.address, Remix2.address, Remix1.address], 0))
+          .to.be.reverted
+      })
+
+      it("Should allow to be multiply flagged and partially unflagged", async () => {
+        await Remix3.connect(addr1).unflag([Remix3.address, Remix2.address], 0)
+        expect(await Remix3.isFlagged(), "The contract should still be flagged").to.be.true
+
+        await Remix3.connect(owner).unflag([Remix3.address, Remix2.address, Remix1.address], 0)
+        expect(await Remix3.isFlagged(), "The contract should not be flagged").to.be.false
       })
 
       it("Should emit the UnFlag signal", async () => {
@@ -437,8 +487,8 @@ describe("Remix-NFT", function () {
           .to.emit(Remix2, "UnFlagged").withArgs(owner.address, Remix2.address)
       })
 
-      it("Should not allow a non parent to unflag", async () => {
-        expect(Remix3.isFlagged() == true, "The starting contract has not been flagged")
+      it("Should not allow a non author of a valid parent to unflag", async () => {
+        expect(await Remix2.isFlagged(), "The starting contract has not been flagged").to.be.true
         await expect(Remix2.connect(addr2).unflag([Remix2.address, Remix1.address], 0))
           .to.be.reverted
       })
@@ -469,14 +519,14 @@ describe("Remix-NFT", function () {
       })
 
       it("Should let the owner flag a remix", async () => {
-        factory.connect(owner).flag(Remix1.address)
-        expect(Remix1.isFlagged() == true, "The remix has not been flagged!")
+        await factory.connect(owner).flag(Remix1.address)
+        expect(await Remix1.isFlagged(), "The remix has not been flagged!").to.be.true
       })
 
       it("Should only let the owner flag a remix", async () => {
         await expect(factory.connect(addr1).flag(Remix1.address))
           .to.be.reverted
-        expect(Remix1.isFlagged() == false, "The remix has not been flagged!")
+        expect(await Remix1.isFlagged(), "The remix has not been flagged!").to.be.false
       })
     })
 
@@ -487,18 +537,18 @@ describe("Remix-NFT", function () {
         await factory.connect(addr1).deploy(...args);
         events = await factory.queryFilter("RemixDeployed")
         Remix1 = RemixFactory.attach(events[events.length - 1].args.contractAddress);
-        factory.flag(Remix1.address);
+        await factory.flag(Remix1.address);
       })
 
       it("Should let the owner unflag a remix", async () => {
-        factory.connect(owner).unflag(Remix1.address, 0)
-        expect(Remix1.isFlagged() == false, "The remix has not been flagged!")
+        await factory.connect(owner).unflag(Remix1.address, 0)
+        expect(await Remix1.isFlagged(), "The remix has not been unflagged!").to.be.false
       })
 
       it("Should only let the owner unflag a remix", async () => {
         await expect(factory.connect(addr1).unflag(Remix1.address, 0))
           .to.be.reverted
-        expect(Remix1.isFlagged() == true, "The remix has been unflagged!")
+        expect(await Remix1.isFlagged(), "The remix has been unflagged but wasn't supposed to be!").to.be.true
       })
     })
 
@@ -523,8 +573,10 @@ describe("Remix-NFT", function () {
         args = buildArgs([owner.address])
         const remix1 = await factory.deploy(...args)
         const remix2 = await factory.deploy(...args)
+        events = await factory.queryFilter("RemixDeployed")
+        
         const authors = await factory.getRemixByAuthor(owner.address)
-        expect(authors == [remix1.address, remix2.address])
+        expect(authors).to.eql([events[0].args.contractAddress, events[1].args.contractAddress])
       });
     });
 

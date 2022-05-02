@@ -1,6 +1,5 @@
-import React, {useState, useEffect } from "react";
+import React, {useState } from "react";
 import { notification, Modal, Button, Row, Col, Card, Form, Result, InputNumber, Skeleton, Image } from 'antd';
-import { DollarOutlined, ShareAltOutlined, FileImageOutlined, EditOutlined } from '@ant-design/icons';
 import Blockies from "react-blockies";
 
 
@@ -13,7 +12,6 @@ export default function BuyRMXButton(props) {
     const { Meta } = Card;
 
     const onBuyRMX = (values) => {
-        //console.log("Buy NFT", values);
         setIsLoading(true)
         props.remix.purchaseRMX(values.price).then((result) => {
             notification.info({ message:"Congratulation, you just bought this collectible NFT!", placement: "bottomRight"})

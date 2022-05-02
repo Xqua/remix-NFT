@@ -1,11 +1,9 @@
-import React, {useState, useEffect } from "react";
+import React, {useState } from "react";
 import { notification, Modal, Button, Row, Col, Card, Form, Result, InputNumber, Skeleton, Image } from 'antd';
-import { DollarOutlined, ShareAltOutlined, FileImageOutlined, EditOutlined } from '@ant-design/icons';
 import Blockies from "react-blockies";
 
 
 export default function BuyNFTButton(props) {
-    // const [remix, setRemix] = useState(props.remix);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -13,13 +11,7 @@ export default function BuyNFTButton(props) {
     
     const { Meta } = Card;
 
-    // useEffect(() => {
-    //     console.log(" >>>>> Updating Remix. Remix NFT state:", props.remix.isCollectibleAvailable)
-    //     setRemix(props.remix)
-    // }, [props.remix, props.remix.state])
-
     const onBuyNFT = (values) => {
-        //console.log("Buy NFT", values);
         setIsLoading(true);
         props.remix.purchaseCollectible(values.price).then((result) => {
             notification.info({ message:"Congratulation, you just bought this collectible NFT!", placement: "bottomRight"})

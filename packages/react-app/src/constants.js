@@ -7,6 +7,21 @@ export const ETHERSCAN_KEY = "PSW8C433Q667DVEX5BCRMGNAH9FSGFZ7Q8";
 // BLOCKNATIVE ID FOR Notify.js:
 export const BLOCKNATIVE_DAPPID = "0b58206a-f3c0-4701-a62f-73c7243e8c77";
 
+// IPFS configuration
+// ======== Local =======
+// you need to have a local ipfs server running with ipfs deamon! Reccomended for heavy development!
+export const IPFS_SERVER_HOST = "localhost";
+export const IPFS_SERVER_PORT = "5001";
+export const IPFS_SERVER_PROTOCOL = "http";
+export const IPFS_ENDPOINT = "http://localhost:8080/ipfs/";
+
+// ===== Online on Infura and Ipfs.io =====
+//export const IPFS_SERVER_HOST = "ipfs.infura.io";
+//export const IPFS_SERVER_PORT = "5001";
+//export const IPFS_SERVER_PROTOCOL = "https";
+//export const IPFS_ENDPOINT = "https://ipfs.io/ipfs/";
+
+
 export const NETWORKS = {
   localhost: {
     name: "localhost",

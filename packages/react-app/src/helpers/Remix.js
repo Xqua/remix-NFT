@@ -1,15 +1,13 @@
 import { ConsoleSqlOutlined } from "@ant-design/icons";
+import { IPFS_SERVER_HOST, IPFS_ENDPOINT, IPFS_SERVER_PORT, IPFS_SERVER_PROTOCOL } from "../constants";
+
 
 const { BufferList } = require("bl");
 // https://www.npmjs.com/package/ipfs-http-client
 const ipfsAPI = require("ipfs-http-client");
-// export const ipfs = ipfsAPI({ host: "ipfs.infura.io", port: "5001", protocol: "https" });
-// const ipfsHost = "https://ipfs.io/ipfs/"
 
-export const ipfs = ipfsAPI({ host: "localhost", port: "5001", protocol: "http" });
-const ipfsHost = "http://localhost:8080/ipfs/"
-
-
+export const ipfs = ipfsAPI({ host: IPFS_SERVER_HOST, port: IPFS_SERVER_PORT, protocol: IPFS_SERVER_PROTOCOL });
+const ipfsHost = IPFS_ENDPOINT
 
 const { ethers, utils } = require("ethers");
 
@@ -69,6 +67,8 @@ export class Remix {
         this.events = {}
         this.authors = []
         this.parents = []
+        this.isFlagged = false;
+        this.flaggingParents = [];
         this.isAuthor = false;
         if (address) {
             if (signer) {
@@ -80,8 +80,6 @@ export class Remix {
             this.loadEvents();
         }
     }
-
-    
 
     get children() {
         if (this.events.DerivativeIssued) {
@@ -98,7 +96,7 @@ export class Remix {
             this.parents,
             this.parentsSplits,
             utils.parseEther(this.RMXPrice.toString()),
-            utils.parseEther(this.RMXincrease.toString()),
+            this.RMXincrease.toString(),
             utils.parseEther(this.NFTprice.toString()),
             this.maxRMXTime,
             this.royalty
@@ -107,7 +105,7 @@ export class Remix {
 
     get isCollectibleAvailable() {
         if (!this.currentCollectibleOwner) return null
-        if (this.currentCollectibleOwner != "0x0000000000000000000000000000000000000000") return false;
+        if (this.currentCollectibleOwner !== "0x0000000000000000000000000000000000000000") return false;
         return true;
     }
 
@@ -154,7 +152,7 @@ export class Remix {
         const values = []
         for (let i = 0; i < result[0].length; i++) {
             let tokenName, logo, value;
-            if (result[0][i] == "0x0000000000000000000000000000000000000000") {
+            if (result[0][i] === "0x0000000000000000000000000000000000000000") {
                 tokenName = "Eth"
                 logo = "https://upload.wikimedia.org/wikipedia/commons/0/05/Ethereum_logo_2014.svg"
                 value = parseFloat(utils.formatEther(result[1][i]))
@@ -196,6 +194,16 @@ export class Remix {
 
     async harvest(tokenAddress) {
         await this.contract.harvestRoyalties(tokenAddress)
+        this.state++;
+    }
+
+    async flag(parentChain) {
+        await this.contract.flag(parentChain)
+        this.state++;
+    }
+
+    async unflag(parentChain, index) {
+        await this.contract.unflag(parentChain, index)
         this.state++;
     }
 
@@ -297,7 +305,7 @@ export class Remix {
             this.authors = data[0];
             this.authorsSplits = data[1];
             if (this.signer) {
-                this.authors.forEach((author) => { if (author == this.signer.address) this.isAuthor = true; })
+                this.authors.forEach((author) => { if (author === this.signer.address) this.isAuthor = true; })
             }
             this.state++;
         });
@@ -341,6 +349,14 @@ export class Remix {
             this.currentCollectibleOwner = data;
             this.state++;
         })
+        this.contract.isFlagged().then((data) => {
+            this.isFlagged = data;
+            this.state++;
+        })
+        this.contract.getFlaggingParents().then((data) => {
+            this.flaggingParents = data;
+            this.state++;
+        })
     }
 
     get isValid() {
@@ -354,9 +370,9 @@ export class Remix {
         if (!this.maxRMXTime) return false;
         if (!this.authors) return false;
         if (!this.authorsSplits) return false;
-        if (this.authors.length == 0) return false;
-        if (this.authors.length != this.authorsSplits.length) return false;
-        if (this.parents.length != this.parentsSplits.length) return false;
+        if (this.authors.length === 0) return false;
+        if (this.authors.length !== this.authorsSplits.length) return false;
+        if (this.parents.length !== this.parentsSplits.length) return false;
         if (!this.RMXMetadata.name) return false;
         if (!this.RMXMetadata.description) return false;
         if (!this.RMXMetadata.image) return false;
@@ -384,7 +400,7 @@ export class Remix {
 
         let cid;
         for await (const result of ipfs.addAll(files)) {
-            if (result.path == "metadata") {
+            if (result.path === "metadata") {
                 cid = result.cid;
             }
         }
@@ -430,6 +446,14 @@ export class RemixFactory {
         }
     }
 
+    get childrenState() {
+        let state = 0;
+        Object.keys(this.remixContracts).forEach((address) => {
+            state += this.remixContracts[address].state;
+        })
+        return state;
+    }
+
     async getRemixByAuthor(author) {
         return this.contract.getRemixByAuthor(author)
     }
@@ -473,7 +497,7 @@ export class RemixFactory {
         const tx = await this.contract.deploy(...remix.deployArgs);
         let contractsAfter = await this.getRemixByAuthor(remix.authors[0])
 
-        if (contractsBefore.length == contractsAfter.length)
+        if (contractsBefore.length === contractsAfter.length)
             throw new Error("There was an unknown error and the address of the contract is not avaiable");
         const newContractAddress = contractsAfter[contractsAfter.length-1];
         const newRemix = new Remix(newContractAddress, this.signer)

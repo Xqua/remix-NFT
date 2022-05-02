@@ -1,18 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button, Divider, Row, Col, Spin, Card, Upload, Image } from 'antd'
 import { FileProtectOutlined, InboxOutlined, FileImageOutlined, FileZipFilled } from '@ant-design/icons';
+import { IPFS_ENDPOINT, IPFS_SERVER_HOST, IPFS_SERVER_PORT, IPFS_SERVER_PROTOCOL } from "../constants";
 
-const { BufferList } = require('bl')
 const ipfsAPI = require('ipfs-http-client');
-//const ipfs = ipfsAPI({ host: 'ipfs.infura.io', port: '5001', protocol: 'https' });
-//const ipfsHost = "https://ipfs.io/ipfs/"
-
-const ipfs = ipfsAPI({host: 'localhost', port: '5001', protocol: 'http' });
-const ipfsHost = "http://localhost:8080/ipfs/"
-
-const DEBUG = true;
-
-//AWS config
+const ipfs = ipfsAPI({ host: IPFS_SERVER_HOST, port: IPFS_SERVER_PORT, protocol: IPFS_SERVER_PROTOCOL });
+const ipfsHost = IPFS_ENDPOINT;
 
 export default function UploadRemixFiles(props) {
     const [isUploading, setIsUploading] = useState();
@@ -84,7 +77,7 @@ export default function UploadRemixFiles(props) {
                         <Col span={24}>
                         {props.collectible.image ?
                                 <>
-                                    <Image width={250} src={props.collectible.image} />
+                                    <Image width="100%" src={props.collectible.image} />
                                     <br/>
                                     <Button type="danger" onClick={() => { const c = { ...props.collectible }; c.image = null; props.setCollectible(c); }}>Remove</Button>
                                 </>
@@ -131,7 +124,7 @@ export default function UploadRemixFiles(props) {
                             <Col className="gutter-row" span={12}>
                                 {props.remix.image ?
                                     <div>
-                                        <Image width={250} src={props.remix.image} />
+                                        <Image width="100%" src={props.remix.image} />
                                         <Button type="danger" onClick={() => { const r = { ...props.remix }; r.image = null; props.setRemix(r); }}>Remove</Button>
                                     </div>
                                     : 
@@ -162,7 +155,7 @@ export default function UploadRemixFiles(props) {
                             <Col className="gutter-row" span={12}>
                                 {props.remix.files ?
                                 <div>
-                                    <FileProtectOutlined style={{width: 250, height:250, fontSize:'72pt'}}/>
+                                    <FileProtectOutlined style={{width: "100%", height:"100%", fontSize:'72pt'}}/>
                                     <Button type="danger" onClick={() => { const r = { ...props.remix }; r.files = null; props.setRemix(r); }}>Remove</Button>
                                 </div>
                                 :

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Skeleton, Timeline } from "antd";
-import { FullscreenOutlined, ClockCircleOutlined, LogoutOutlined, DollarOutlined, PlusCircleOutlined, PieChartOutlined, ManOutlined, WomanOutlined, RightCircleOutlined } from "@ant-design/icons";
+import { FullscreenOutlined, LogoutOutlined, DollarOutlined, PlusCircleOutlined, PieChartOutlined, ManOutlined, WomanOutlined, RightCircleOutlined } from "@ant-design/icons";
 
 export default function RemixActivity(props) {
     const [remix, setRemix] = useState(props.remix ? props.remix : {});

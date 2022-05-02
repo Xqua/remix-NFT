@@ -1,6 +1,5 @@
 import React, {useState, useEffect, useContext } from "react";
 import { List, Skeleton, Avatar, Space, Modal } from 'antd';
-import { Link } from "react-router-dom";
 import { RemixContext } from "../helpers"
 import { RemixContainer } from ".";
 
@@ -10,15 +9,10 @@ export default function RemixListItem(props) {
     const [remixContext, setRemixContext] = useContext(RemixContext);
     const [selectedRemix, setSelectedRemix] = useState();
     const [isModalVisible, setIsModalVisible] = useState(false);
-    //const writeContract = useContractLoader(props.signer, { chainId: props.localChainId, customAddresses: { "Remix": remix.address } }); 
 
     useEffect(() => {
         setRemix(props.remix)
-    }, [props.remix])
-
-    useEffect(() => {
-        setRemix({ ...props.remix })
-    }, [props.remix.state])
+    }, [props.remix, props.remix.state])
 
     const isLoading = () => {
         if (remix == null) return true;
@@ -44,7 +38,6 @@ export default function RemixListItem(props) {
                 </Space>
             </Skeleton>
             <Modal 
-                forceRender={true}
                 title={selectedRemix?.RMXMetadata?.name} 
                 visible={isModalVisible} 
                 onOk={() => setIsModalVisible(false)} 

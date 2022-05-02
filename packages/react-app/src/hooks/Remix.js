@@ -1,17 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-    useEventListener,
-} from "../hooks";
-import { Remix } from "../helpers/Remix";
 
-const { BufferList } = require("bl");
-// https://www.npmjs.com/package/ipfs-http-client
-const ipfsAPI = require("ipfs-http-client");
-export const ipfs = ipfsAPI({ host: "ipfs.infura.io", port: "5001", protocol: "https" });
-
-const { ethers } = require("ethers");
-
-const DEBUG = true;
+var createGraph = require('ngraph.graph');
 
 const useRemix = (remixFactory, userSigner) => {
     const [remixContracts, setRemixContracts] = useState(remixFactory ? remixFactory.remixContracts : {});
@@ -58,4 +47,33 @@ const useAddressRemixes = ( remixFactory, address) => {
     return myContracts;
 };
 
-export { useRemix, useAddressRemixes };
+const useRemixGraph = (remixFactory) => {
+    const [graph, setGraph] = useState(createGraph())
+
+    useEffect(() => {
+        console.log(">>>>>>> Updating remix Contracts: ", remixFactory.remixContracts)
+        if (remixFactory.remixContracts) {
+            console.log("Creating graph!")
+            const newGraph = createGraph();
+            Object.keys(remixFactory.remixContracts).forEach((remixAddress) => {
+                console.log("Adding Node:", remixAddress)
+                newGraph.addNode(remixAddress);
+                remixFactory.remixContracts[remixAddress].children.forEach((childAddress) => {
+                    newGraph.addNode(childAddress);
+                    newGraph.addLink(remixAddress, childAddress);
+                    console.log("Adding Link to:", childAddress)
+                })
+                remixFactory.remixContracts[remixAddress].parents.forEach((parentAddress) => {
+                    newGraph.addNode(parentAddress);
+                    newGraph.addLink(parentAddress, remixAddress);
+                    console.log("Adding Link to:", parentAddress)
+                })
+            })
+            setGraph(newGraph);
+        }
+    }, [remixFactory, remixFactory.state, remixFactory.remixContracts, remixFactory.childrenState])
+
+    return graph;
+}
+
+export { useRemix, useAddressRemixes, useRemixGraph };
