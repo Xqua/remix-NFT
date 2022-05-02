@@ -12,11 +12,9 @@ import {
   GasGauge, 
   Header, 
   Ramp, 
-  ThemeSwitch, 
-  RemixDeploy, 
-  RemixCardList,
-  RemixGraph
+  ThemeSwitch
 } from "./components";
+import { Deploy, RemixCardList, RemixGraph } from "./components/Remix"
 import {INFURA_ID, NETWORK, NETWORKS } from "./constants";
 import { Transactor } from "./helpers";
 import {
@@ -396,7 +394,7 @@ function App(props) {
               }}
               to="/graph"
             >
-              Explore
+              Network
             </Link>
           </Menu.Item>
           <Menu.Item key="/mine">
@@ -453,7 +451,7 @@ function App(props) {
               />
             </Route>
             <Route path="/mint">
-              <RemixDeploy
+              <Deploy
                 address={address}
                   remixContracts={remixContracts ? Object.keys(remixContracts).map((remix) => (remixContracts[remix])).filter((remix) => remix.canDerive): []}
                 remixFactory={remixFactory}

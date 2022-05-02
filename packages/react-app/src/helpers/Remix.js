@@ -198,21 +198,23 @@ export class Remix {
     }
 
     async flag(parentChain) {
-        await this.contract.flag(parentChain)
+        await this.contract.flag(parentChain);
+        this.flaggingParents = await this.contract.getFlaggingParents();
         this.state++;
     }
 
     async unflag(parentChain, index) {
         await this.contract.unflag(parentChain, index)
+        this.flaggingParents = await this.contract.getFlaggingParents();
         this.state++;
     }
 
     getTokenName(tokenID) {
         switch (tokenID) {
             case 0:
-                return "RMX"
-            case 1:
                 return "Collectible"
+            case 1:
+                return "RMX"
             case 2:
                 return "Derivative"
             case 3:
@@ -336,11 +338,11 @@ export class Remix {
         this.contract.uri(0).then((data) => {
             this.uri = data;
             this.state++;
-            readJSONFromIPFS(this.uri.replace(/{(.*?)}/, 1)).then((data) => {
+            readJSONFromIPFS(this.uri.replace(/{(.*?)}/, 0)).then((data) => {
                 this.CollectibleMetadata = data;
                 this.state++;
             });
-            readJSONFromIPFS(this.uri.replace(/{(.*?)}/, 0)).then((data) => {
+            readJSONFromIPFS(this.uri.replace(/{(.*?)}/, 1)).then((data) => {
                 this.RMXMetadata = data;
                 this.state++;
             });

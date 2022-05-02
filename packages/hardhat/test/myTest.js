@@ -41,9 +41,15 @@ describe("Remix-NFT", function () {
   let events;
   let owner, addr1, addr2, addrs;
   
-  const deployRemix = async (args) => {
-    const contract = await RemixFactory.deploy("")
-    contract.initialize(...args);
+  const deployRemix = async (args, signer) => {
+    let contract;
+    if (signer) {
+      contract = await RemixFactory.connect(signer).deploy("")
+      contract.connect(signer).initialize(...args);
+    } else {
+      contract = await RemixFactory.deploy("")
+      contract.initialize(...args);
+    }
     return contract;
   }
   //const [owner, addr1, addr2] = await ethers.getSigners();
@@ -374,14 +380,13 @@ describe("Remix-NFT", function () {
 
         Remix1 = await deployRemix(args);
         await Remix1.connect(addr1).purchaseRMX(overrides)
-        args = buildArgs([addr1.address], [Remix1.address])
 
-        Remix2 = await deployRemix(args);
+        args = buildArgs([addr1.address], [Remix1.address])
+        Remix2 = await deployRemix(args, addr1);
         await Remix2.connect(addr2).purchaseRMX(overrides)
 
         args = buildArgs([addr2.address], [Remix2.address])
-
-        Remix3 = await deployRemix(args);
+        Remix3 = await deployRemix(args, addr2);
       })
 
       it("Should flag from first parent", async () => {
@@ -434,18 +439,18 @@ describe("Remix-NFT", function () {
         overrides = { value: utils.parseEther("0.1") }
 
         args = buildArgs([owner.address])
-        Remix1 = await deployRemix(args);
+        Remix1 = await deployRemix(args, owner);
         await Remix1.connect(addr1).purchaseRMX(overrides)
-
+        
         args = buildArgs([addr1.address], [Remix1.address])
-        Remix2 = await deployRemix(args);
+        Remix2 = await deployRemix(args, addr1);
         await Remix2.connect(addr2).purchaseRMX(overrides)
-
+        
         args = buildArgs([addr2.address], [Remix2.address])
         Remix3 = await deployRemix(args);
-
+        
         await Remix2.connect(owner).flag([Remix2.address, Remix1.address])
-        await Remix3.connect(owner).flag([Remix3.address, Remix2.address])
+        await Remix3.connect(addr1).flag([Remix3.address, Remix2.address])
         await Remix3.connect(owner).flag([Remix3.address, Remix2.address, Remix1.address])
       })
 
@@ -491,6 +496,15 @@ describe("Remix-NFT", function () {
         expect(await Remix2.isFlagged(), "The starting contract has not been flagged").to.be.true
         await expect(Remix2.connect(addr2).unflag([Remix2.address, Remix1.address], 0))
           .to.be.reverted
+      })
+
+      it("Should allow to reflag", async () => {
+        await Remix2.connect(owner).unflag([Remix2.address, Remix1.address], 0)
+        expect(await Remix2.isFlagged(), "The contract has not been unflagged").to.be.false
+        await Remix2.connect(owner).flag([Remix2.address, Remix1.address])
+        expect(await Remix2.isFlagged(), "The contract has not been flagged").to.be.true
+        await Remix2.connect(owner).unflag([Remix2.address, Remix1.address], 0)
+        expect(await Remix2.isFlagged(), "The contract has not been unflagged").to.be.false
       })
     })
   })

@@ -58,6 +58,7 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
 
     enum TokenTypes {
         Collectible,
+        RMX,
         Derivative,
         Badge,
         Flag
@@ -268,8 +269,8 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
         if (!flaggingParentsExists[_parents[_parents.length -1]]) {
             flaggingParents.push(_parents[_parents.length -1]);
             flaggingParentsExists[_parents[_parents.length -1]] = true;
+            emit Flagged(msg.sender, address(this));
         }
-        emit Flagged(msg.sender, address(this));
     }
 
     /// @dev Removes a flag token from a child remix in case of unfair use or other complaints
@@ -282,8 +283,13 @@ contract Remix is ERC1155Supply, ERC1155Holder, IERC2981, ERC165Storage {
             requireIsValidParentsChain(_parents);
         }
         require(flaggingParents[index] == _parents[_parents.length - 1], "The flagging parent must be the one calling unflag");
+        require(flaggingParentsExists[_parents[_parents.length -1]], "The parent has not flagged the child");
         flaggingParents[index] = flaggingParents[flaggingParents.length - 1];
         flaggingParents.pop();
+        // If the factory unflags a child, then the parent should not be able to flag it again
+        if (msg.sender != remixFactory) {
+            flaggingParentsExists[_parents[_parents.length -1]] = false;
+        }
         emit UnFlagged(msg.sender, address(this));
     }
 
