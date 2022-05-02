@@ -6,11 +6,15 @@ import Blockies from "react-blockies";
 import { BuyNFTButton, BuyRMXButton, RemixContainer } from "."
 
 export default function RemixCard(props) {
-    const [remix, setRemix] = useState(props.remix ? props.remix : {});
+    const [remix, setRemix] = useState({});
     let history = useHistory();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isBuyModalVisible, setIsBuyModalVisible] = useState(false);
     
+    useEffect(() => {
+        setRemix(props.remix)
+    }, [props.remix, props.remix.state])
+
     const { Meta } = Card;
 
     return (

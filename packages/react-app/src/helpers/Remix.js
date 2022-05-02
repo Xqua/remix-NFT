@@ -67,7 +67,6 @@ export class Remix {
         this.events = {}
         this.authors = []
         this.parents = []
-        this.isFlagged = false;
         this.flaggingParents = [];
         this.isAuthor = false;
         if (address) {
@@ -79,6 +78,10 @@ export class Remix {
             this.loadData();
             this.loadEvents();
         }
+    }
+
+    get isFlagged() {
+        return this.flaggingParents.length > 0;
     }
 
     get children() {
@@ -131,6 +134,8 @@ export class Remix {
             "CollectiblePurchased",
             "DerivativeIssued",
             "Mint",
+            "Flagged",
+            "UnFlagged",
             "ParentAdded",
             "RMXPurchased",
             "RoyaltiesHarvested",
@@ -349,10 +354,6 @@ export class Remix {
         });
         this.contract.currentCollectibleOwner().then((data) => {
             this.currentCollectibleOwner = data;
-            this.state++;
-        })
-        this.contract.isFlagged().then((data) => {
-            this.isFlagged = data;
             this.state++;
         })
         this.contract.getFlaggingParents().then((data) => {
