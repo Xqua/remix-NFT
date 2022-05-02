@@ -1,6 +1,6 @@
 import React, {useState, useEffect } from "react";
 import { useHistory } from "react-router-dom";
-import { Divider, Card, Row, Col, Statistic, Image, Skeleton, Modal } from 'antd';
+import { Divider, Card, Badge, Row, Col, Statistic, Image, Skeleton, Modal } from 'antd';
 import { DollarOutlined, FileImageOutlined, EditOutlined } from '@ant-design/icons';
 import Blockies from "react-blockies";
 import { BuyNFTButton, BuyRMXButton, RemixContainer } from "."
@@ -11,29 +11,33 @@ export default function RemixCard(props) {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isBuyModalVisible, setIsBuyModalVisible] = useState(false);
     
-    useEffect(() => {
-        setRemix(props.remix)
-    }, [props.remix, props.remix.state])
-
     const { Meta } = Card;
 
     return (
         <Card
             style={{ width: 300 }}
-            cover={remix?.CollectibleMetadata == null ? 
-                <Skeleton.Image active style={{width:300, height:200}} />
+            cover={remix?.CollectibleMetadata == null ?
+                <Skeleton.Image active style={{ width: 300, height: 200 }} />
                 :
-                <Image
-                    alt={remix?.CollectibleMetadata?.name}
-                    src={remix?.CollectibleMetadata?.image}
-                />
+                remix.isFlagged ? 
+                    <Badge.Ribbon text="Flagged!" color="red">
+                        <Image
+                            alt={remix?.CollectibleMetadata?.name}
+                            src={remix?.CollectibleMetadata?.image}
+                        />
+                    </Badge.Ribbon>
+                :
+                    <Image
+                        alt={remix?.CollectibleMetadata?.name}
+                        src={remix?.CollectibleMetadata?.image}
+                    />
             }
             actions={[
-                <FileImageOutlined key="Show" onClick={() => setIsModalVisible(true)}/>,
-                <DollarOutlined key="Buy" onClick={() => setIsBuyModalVisible(true)}/>,
-                <EditOutlined key="edit" onClick={() => { if (remix.address) {props.onDebug(remix.address); history.push("/debugcontracts")}}} />
+                <FileImageOutlined key="Show" onClick={() => setIsModalVisible(true)} />,
+                <DollarOutlined key="Buy" onClick={() => setIsBuyModalVisible(true)} />,
+                <EditOutlined key="edit" onClick={() => { if (remix.address) { props.onDebug(remix.address); history.push("/debugcontracts") } }} />
             ]}
-        >   
+        >
             <Skeleton avatar active loading={remix?.CollectibleMetadata == null}>
                 <Meta
                     avatar={<Blockies seed={remix?.author != null ? remix.authors[0].toLowerCase() : "seed"} />}
@@ -59,8 +63,8 @@ export default function RemixCard(props) {
             >
                 <RemixContainer remix={remix} />
             </Modal>
-            <Modal 
-                title="Buy this Remix" 
+            <Modal
+                title="Buy this Remix"
                 visible={isBuyModalVisible}
                 onOk={() => setIsBuyModalVisible(false)}
                 onCancel={() => setIsBuyModalVisible(false)}
