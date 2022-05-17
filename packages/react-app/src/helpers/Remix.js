@@ -58,6 +58,11 @@ const getERC20Info = async (address, blockchain = "ethereum") => {
 
   */
 export class Remix {
+    /**
+     * constructor for the Remix class
+     * @param  {[string]} address Optional: This is the address of a Remix contract, if provided the contract informations will be loaded
+     * @param  {[signer]} signer Optional: This is a signer from the etherjs library, if provided it allows for contract interaction
+     */
     constructor(address, signer) {
         this.state = 0;
         this.address = address;
@@ -80,10 +85,19 @@ export class Remix {
         }
     }
 
+    /**
+     * convenience function to get the flagged state with no chain calls
+     * @returns  {boolean} Returns the flagged state of the Remix contract.
+     */
     get isFlagged() {
         return this.flaggingParents.length > 0;
     }
 
+
+    /**
+     * convenience function to get the childrens of the remix contract
+     * @returns  {String[]} Returns the array of addresses of the contract children.
+     */
     get children() {
         if (this.events.DerivativeIssued) {
             return this.events.DerivativeIssued.map((data) => (data.args.dst))
@@ -91,6 +105,10 @@ export class Remix {
         return [];
     } 
 
+    /**
+     * convenience function to generate the arguments in the right order for contract deployement
+     * @returns  {Array} Returns the array of arguments for contract deployement.
+     */
     get deployArgs() {
         return [
             this.uri,
@@ -106,12 +124,20 @@ export class Remix {
         ];
     }
 
+    /**
+     * convenience function to get the status of the collectible NFT, if it has already been bought.
+     * @returns  {Boolean} Returns the bought status of the collectible NFT.
+     */
     get isCollectibleAvailable() {
         if (!this.currentCollectibleOwner) return null
         if (this.currentCollectibleOwner !== "0x0000000000000000000000000000000000000000") return false;
         return true;
     }
 
+    /**
+     * convenience function to get the price history of the collectible and RMX tokens.
+     * @returns  {Array.Object} Returns the an array of objects of the form: [{token: [TokenName], price: [Eth amount]}, ...] .
+     */
     get priceHistory() {
         let prices = []
         if (this.events.CollectiblePurchased) {
@@ -127,6 +153,10 @@ export class Remix {
         return prices;
     }
 
+    /**
+     * convenience function to get the activity of a Remix contract, sorted from the origin to the current block
+     * @returns {Events[]]} The array of sorted events
+     */
     get activity() {
         let activity = []
         let selectedEvent = [
@@ -152,6 +182,10 @@ export class Remix {
         return activity;
     }
 
+    /**
+     * Wrapper function to get the current value held by a Remix contract. This returns Eth and ERC20s held
+     * @returns {Object[]} The array of values held in the form: [{token: TokenName, logo: tokenImageURL, value: formatedValue, address: addressOfToken}]
+     */
     async valueHeld() {
         const result = await this.contract.getRoyalties();
         const values = []
@@ -495,17 +529,16 @@ export class RemixFactory {
     }
 
     async deploy(remix) {
-        let contractsBefore = await this.getRemixByAuthor(remix.authors[0])
+        // let contractsBefore = await this.getRemixByAuthor(remix.authors[0])
         if (!this.signer) throw new Error("Signer is not set!");
         const tx = await this.contract.deploy(...remix.deployArgs);
-        let contractsAfter = await this.getRemixByAuthor(remix.authors[0])
-
-        if (contractsBefore.length === contractsAfter.length)
-            throw new Error("There was an unknown error and the address of the contract is not avaiable");
-        const newContractAddress = contractsAfter[contractsAfter.length-1];
-        const newRemix = new Remix(newContractAddress, this.signer)
-        this.remixContracts[newContractAddress] = newRemix;
-        this.state++
-        return newRemix;
+        // let contractsAfter = await this.getRemixByAuthor(remix.authors[0])
+        // if (contractsBefore.length === contractsAfter.length)
+        //     throw new Error("There was an unknown error and the address of the contract is not avaiable");
+        // const newContractAddress = contractsAfter[contractsAfter.length-1];
+        // const newRemix = new Remix(newContractAddress, this.signer)
+        // this.remixContracts[newContractAddress] = newRemix;
+        // this.state++
+        // return newRemix;
     }
 }

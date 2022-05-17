@@ -142,7 +142,7 @@ export default function Deploy(props) {
       // Deploying Remix contract
       remixFactory.deploy(remix).then((contract) => {
         notification.info({
-          message: "Remix contract deployed! Address is:" + contract.address,
+          message: "Remix contract deployed!",
           placement: "bottomRight",
         });
         setIsDeploying(false);
