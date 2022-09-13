@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Button, Divider, Row, Col, Spin, Card, Upload, Image } from 'antd'
 import { FileProtectOutlined, InboxOutlined, FileImageOutlined, FileZipFilled } from '@ant-design/icons';
-import { IPFS_ENDPOINT, IPFS_SERVER_HOST, IPFS_SERVER_PORT, IPFS_SERVER_PROTOCOL } from "../../constants";
+import { IPFS_AUTH, IPFS_ENDPOINT, IPFS_SERVER_HOST, IPFS_SERVER_PORT, IPFS_SERVER_PROTOCOL } from "../../constants";
 
 const ipfsAPI = require('ipfs-http-client');
-const ipfs = ipfsAPI({ host: IPFS_SERVER_HOST, port: IPFS_SERVER_PORT, protocol: IPFS_SERVER_PROTOCOL });
+export const ipfs = ipfsAPI({ host: IPFS_SERVER_HOST, port: IPFS_SERVER_PORT, protocol: IPFS_SERVER_PROTOCOL, headers: { authorization: IPFS_AUTH } });
 const ipfsHost = IPFS_ENDPOINT;
 
 export default function UploadFiles(props) {

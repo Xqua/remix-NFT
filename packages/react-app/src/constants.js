@@ -1,5 +1,6 @@
 // MY INFURA_ID, SWAP IN YOURS FROM https://infura.io/dashboard/ethereum
-export const INFURA_ID = "460f40a260564ac4a4f4b3fffb032dad";
+export const INFURA_ID = process.env.REACT_APP_INFURA_ID;
+
 
 // MY ETHERSCAN_ID, SWAP IN YOURS FROM https://etherscan.io/myapikey
 export const ETHERSCAN_KEY = "PSW8C433Q667DVEX5BCRMGNAH9FSGFZ7Q8";
@@ -19,8 +20,8 @@ export const BLOCKNATIVE_DAPPID = "0b58206a-f3c0-4701-a62f-73c7243e8c77";
 export const IPFS_SERVER_HOST = "ipfs.infura.io";
 export const IPFS_SERVER_PORT = "5001";
 export const IPFS_SERVER_PROTOCOL = "https";
-export const IPFS_ENDPOINT = "https://ipfs.io/ipfs/";
-
+export const IPFS_ENDPOINT = process.env.REACT_APP_IPFS_ENDPOINT ? process.env.REACT_APP_IPFS_ENDPOINT : "https://ipfs.infura.io/ipfs/";
+export const IPFS_AUTH = 'Basic ' + Buffer.from(process.env.REACT_APP_INFURA_ID + ':' + process.env.REACT_APP_INFURA_SECRET).toString('base64');
 
 export const NETWORKS = {
   localhost: {

@@ -1,1 +1,1 @@
-module.exports = ["Remix"];
+module.exports = ["RemixFactory", "Remix"];

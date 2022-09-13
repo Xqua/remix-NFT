@@ -1,14 +1,15 @@
+import { IPFS_AUTH, IPFS_ENDPOINT, IPFS_SERVER_HOST, IPFS_SERVER_PORT, IPFS_SERVER_PROTOCOL } from "../src/constants";
+
 const ipfsAPI = require("ipfs-http-client");
 const chalk = require("chalk");
 const { clearLine } = require("readline");
 
 const { globSource } = ipfsAPI;
 
-// Using infura
-const infura = { host: "ipfs.infura.io", port: "5001", protocol: "https" };
-const ipfs = ipfsAPI(infura);
 
-const ipfsGateway = "https://ipfs.io/ipfs/";
+const ipfs = ipfsAPI({ host: IPFS_SERVER_HOST, port: IPFS_SERVER_PORT, protocol: IPFS_SERVER_PROTOCOL, headers: { authorization: IPFS_AUTH } });
+
+const ipfsGateway = IPFS_ENDPOINT;
 const ipnsGateway = "https://ipfs.io/ipns/";
 // run your own ipfs daemon: https://docs.ipfs.io/how-to/command-line-quick-start/#install-ipfs
 // const localhost = { host: "localhost", port: "5001", protocol: "http" };

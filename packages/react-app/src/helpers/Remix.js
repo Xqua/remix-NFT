@@ -1,12 +1,12 @@
 import { ConsoleSqlOutlined } from "@ant-design/icons";
-import { IPFS_SERVER_HOST, IPFS_ENDPOINT, IPFS_SERVER_PORT, IPFS_SERVER_PROTOCOL } from "../constants";
+import { IPFS_SERVER_HOST, IPFS_ENDPOINT, IPFS_SERVER_PORT, IPFS_SERVER_PROTOCOL, IPFS_AUTH } from "../constants";
 
 
 const { BufferList } = require("bl");
 // https://www.npmjs.com/package/ipfs-http-client
 const ipfsAPI = require("ipfs-http-client");
 
-export const ipfs = ipfsAPI({ host: IPFS_SERVER_HOST, port: IPFS_SERVER_PORT, protocol: IPFS_SERVER_PROTOCOL });
+export const ipfs = ipfsAPI({ host: IPFS_SERVER_HOST, port: IPFS_SERVER_PORT, protocol: IPFS_SERVER_PROTOCOL, headers: { authorization: IPFS_AUTH } });
 const ipfsHost = IPFS_ENDPOINT
 
 const { ethers, utils } = require("ethers");
@@ -24,7 +24,9 @@ const getFromIPFS = async hashToGet => {
 };
 
 const readJSONFromIPFS = async (uri) => {
-    const ipfsHash = uri.replace(ipfsHost, "");
+    const cidMatch = /([A-Z])\w+/g
+    const ipfsHash = cidMatch.exec(uri)[0];
+    // const ipfsHash = uri.replace(ipfsHost, "");
     try {
         const jsonManifestBuffer = await getFromIPFS(ipfsHash);
         const jsonManifest = JSON.parse(jsonManifestBuffer.toString());
@@ -84,6 +86,10 @@ export class Remix {
             this.loadEvents();
         }
     }
+
+    // =============================
+    // ========== GETTERS ==========
+    // =============================
 
     /**
      * convenience function to get the flagged state with no chain calls
@@ -183,9 +189,41 @@ export class Remix {
     }
 
     /**
+     * check if the Remix class has a valid state
+     */
+    get isValid() {
+        if (!this.uri) return false;
+        if (!this.RMXMetadata) return false;
+        if (!this.CollectibleMetadata) return false;
+        if (!this.CollectiblePrice) return false;
+        if (!this.RMXPrice) return false;
+        if (!this.RMXincrease) return false;
+        if (!this.royalty) return false;
+        if (!this.maxRMXTime) return false;
+        if (!this.authors) return false;
+        if (!this.authorsSplits) return false;
+        if (this.authors.length === 0) return false;
+        if (this.authors.length !== this.authorsSplits.length) return false;
+        if (this.parents.length !== this.parentsSplits.length) return false;
+        if (!this.RMXMetadata.name) return false;
+        if (!this.RMXMetadata.description) return false;
+        if (!this.RMXMetadata.image) return false;
+        if (!this.RMXMetadata.files) return false;
+        if (!this.CollectibleMetadata.name) return false;
+        if (!this.CollectibleMetadata.description) return false;
+        if (!this.CollectibleMetadata.image) return false;
+        return true;
+    }
+
+    // =============================
+    // ========= WRAPPERS ==========
+    // =============================
+
+    /**
      * Wrapper function to get the current value held by a Remix contract. This returns Eth and ERC20s held
      * @returns {Object[]} The array of values held in the form: [{token: TokenName, logo: tokenImageURL, value: formatedValue, address: addressOfToken}]
      */
+    // TODO: Add te ERC20 list of address to check as a param, and change the contract to reflect that param!
     async valueHeld() {
         const result = await this.contract.getRoyalties();
         const values = []
@@ -211,6 +249,11 @@ export class Remix {
         return values
     }
 
+    /**
+     * Wrapper function used to purchase the collectible NFT associated with the remix. 
+     * @param {Float} price The price of the collectible in formated amount (not big int!) 
+     * @returns {Transaction} The transaction resulting from this purchase
+     */
     async purchaseCollectible(price) {
         let overrides = {
             value: utils.parseEther(price.toString())     // ether in this case MUST be a string
@@ -221,6 +264,11 @@ export class Remix {
         return result;
     }
 
+    /**
+     * Wrapper function used to purchase the RMX token associated with the remix. 
+     * @param {Float} price The price of the RMX in formated amount (not big int! ex: for 0.1 Eth price=0.1) 
+     * @returns {Transaction} The transaction resulting from this purchase
+     */
     async purchaseRMX(price) {
         let overrides = {
             value: utils.parseEther(price.toString())     // ether in this case MUST be a string
@@ -231,23 +279,100 @@ export class Remix {
         return result;
     }
 
+    /**
+     * Wrapper function to harvest the value held in a Remix.
+     * @param {String} tokenAddress the address of the token to harvest, can be 0x0 for Eth or any valid ERC20 address
+     * @returns {Transaction} The transaction resulting from this action
+     */
     async harvest(tokenAddress) {
-        await this.contract.harvestRoyalties(tokenAddress)
+        const result = await this.contract.harvestRoyalties(tokenAddress)
         this.state++;
+        return result;
     }
 
+    /**
+     * Wrapper function to flag a Remix from a parent.
+     * @param {String[]} parentChain A valid chain of parent addresses that starts from this Remix, and ends at the parents that is flagging it. 
+     * @returns {Transaction} The transaction resulting from this action
+     */
     async flag(parentChain) {
-        await this.contract.flag(parentChain);
+        const result = await this.contract.flag(parentChain);
         this.flaggingParents = await this.contract.getFlaggingParents();
         this.state++;
+        return result;
     }
 
+    /**
+     * Wrapper function to unflag a Remix from a parent.
+     * @param {String[]} parentChain A valid chain of parent addresses that starts from this Remix, and ends at the parents that is flagging it. 
+     * @param {Number} index The index of the flag
+     * @returns {Transaction} The transaction resulting from this action
+     */
     async unflag(parentChain, index) {
         await this.contract.unflag(parentChain, index)
         this.flaggingParents = await this.contract.getFlaggingParents();
         this.state++;
     }
 
+    /**
+     * Functions that takes care of uploading the JSON metadata corresponding to the TokenURI info to IPFS.
+     * @returns {(String, String)} A tuple of the hash and the URI for the uploaded files.
+     */    
+    async uploadMetadata() {
+        let files = [];
+        if (!this.RMXMetadata)
+            throw new Error("Remix Metadata are not set!")
+        files.push({
+            path: "metadata/0.json",
+            content: JSON.stringify(this.RMXMetadata),
+        });
+        if (!this.CollectibleMetadata)
+            throw new Error("Collectible Metadata are not set!")
+        files.push({
+            path: "metadata/1.json",
+            content: JSON.stringify(this.CollectibleMetadata),
+        });
+
+        let cid;
+        for await (const result of ipfs.addAll(files)) {
+            if (result.path === "metadata") {
+                cid = result.cid;
+            }
+        }
+        const hash = cid.toString();
+        this.uri = ipfsHost + hash + "/{id}.json";
+        return (hash, this.uri);
+    }
+
+    /**
+     * This function deploys a new Remix contract on chain.
+     * @returns {Contract} The contract object from EthersJS of the deployed Remix.
+     */
+    //TODO Clean this to move the factory deploy to the factory, and retain a non factory deploy for Remix here
+    async deploy() {
+        if (!this.isValid)
+            throw "Not all fields have been set!";
+        if (!this.signer)
+            throw "Signer has not been defined!";
+        const factory = new ethers.ContractFactory(this.artifact.abi, this.artifact.bytecode, this.signer);
+        const contract = await factory.deploy();
+        if (!contract.address)
+            throw "There was an unknown error and the address of the contract is not avaiable";
+        await contract.initialize(...this.deployArgs);
+        this.address = contract.address;
+        this.contract = new ethers.Contract(this.address, this.artifact.abi, this.signer);
+        return this.contract;
+    }
+
+    // =============================
+    // ========= INTERNALS =========
+    // =============================
+
+    /**
+     * Convenience function to get the corresponding to a Token ID
+     * @param {Number} tokenID The token ID as an integer
+     * @returns {String} The name of the tokenID
+     */
     getTokenName(tokenID) {
         switch (tokenID) {
             case 0:
@@ -261,6 +386,9 @@ export class Remix {
         }
     }
 
+    /**
+     * Internal function that starts a listener on the purchase of a RMX token. Used to update prices as buy actions are performed on chain.
+     */
     startRMXPurchaseListener() {
         try {
             this.contract.on("RMXPurchased", (...events) => {
@@ -278,6 +406,9 @@ export class Remix {
         }
     }
 
+    /**
+     * Internal function that starts a listener on the purchase of a Collectible NFT. Used to update prices as buy actions are performed on chain.
+     */    
     startCollectiblePurchaseListener() {
         try {
             this.contract.on("CollectiblePurchased", (...events) => {
@@ -295,6 +426,9 @@ export class Remix {
         }
     }
 
+    /**
+     * Internal function that starts a listener on the harvesting of royalties. Used to update prices and value held as harvest actions are performed on chain.
+     */
     startRoyalitiesListener() {
         try {
             this.contract.on("RoyaltiesHarvested", (...events) => {
@@ -321,6 +455,9 @@ export class Remix {
         }
     }
 
+    /**
+     * Internal function used to load all events corresponding to a Remix NFT, events are stored in the class this.events array.
+     */
     loadEvents() {
         const eventNames = Object.keys(this.contract.interface.events).map(key => (this.contract.interface.events[key].name))
         eventNames.forEach((eventName) => {
@@ -341,6 +478,9 @@ export class Remix {
         this.startRoyalitiesListener();
     }
 
+    /**
+     * Internal function used to load the data associated with a Remix contract. All updates are done async.
+     */
     loadData() {
         this.contract.getAuthorsAndSplits().then((data) => {
             this.authors = data[0];
@@ -395,72 +535,8 @@ export class Remix {
             this.state++;
         })
     }
-
-    get isValid() {
-        if (!this.uri) return false;
-        if (!this.RMXMetadata) return false;
-        if (!this.CollectibleMetadata) return false;
-        if (!this.CollectiblePrice) return false;
-        if (!this.RMXPrice) return false;
-        if (!this.RMXincrease) return false;
-        if (!this.royalty) return false;
-        if (!this.maxRMXTime) return false;
-        if (!this.authors) return false;
-        if (!this.authorsSplits) return false;
-        if (this.authors.length === 0) return false;
-        if (this.authors.length !== this.authorsSplits.length) return false;
-        if (this.parents.length !== this.parentsSplits.length) return false;
-        if (!this.RMXMetadata.name) return false;
-        if (!this.RMXMetadata.description) return false;
-        if (!this.RMXMetadata.image) return false;
-        if (!this.RMXMetadata.files) return false;
-        if (!this.CollectibleMetadata.name) return false;
-        if (!this.CollectibleMetadata.description) return false;
-        if (!this.CollectibleMetadata.image) return false;
-        return true;
-    }
-
-    async uploadMetadata() {
-        let files = [];
-        if (!this.RMXMetadata)
-            throw new Error("Remix Metadata are not set!")
-        files.push({
-            path: "metadata/0.json",
-            content: JSON.stringify(this.RMXMetadata),
-        });
-        if (!this.CollectibleMetadata)
-            throw new Error("Collectible Metadata are not set!")
-        files.push({
-            path: "metadata/1.json",
-            content: JSON.stringify(this.CollectibleMetadata),
-        });
-
-        let cid;
-        for await (const result of ipfs.addAll(files)) {
-            if (result.path === "metadata") {
-                cid = result.cid;
-            }
-        }
-        const hash = cid.toString();
-        this.uri = ipfsHost + hash + "/{id}.json";
-        return (hash, this.uri);
-    }
-
-    async deploy() {
-        if (!this.isValid)
-            throw "Not all fields have been set!";
-        if (!this.signer)
-            throw "Signer has not been defined!";
-        const factory = new ethers.ContractFactory(this.artifact.abi, this.artifact.bytecode, this.signer);
-        const contract = await factory.deploy();
-        if (!contract.address)
-            throw "There was an unknown error and the address of the contract is not avaiable";
-        await contract.initialize(...this.deployArgs);
-        this.address = contract.address;
-        this.contract = new ethers.Contract(this.address, this.artifact.abi, this.signer);
-        return this.contract;
-    }
 }
+
 
 export class RemixFactory {
     constructor(address, signer) {

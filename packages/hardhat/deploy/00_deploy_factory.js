@@ -16,7 +16,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log: true,
   });
 };
-module.exports.tags = ["RemixFactory", "Remix"];
+module.exports.tags = ["RemixFactory"];
 
 /*
 Tenderly verification
