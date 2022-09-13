@@ -140,13 +140,16 @@ export default function Deploy(props) {
         placement: "bottomRight",
       });
       // Deploying Remix contract
-      remixFactory.deploy(remix).then((contract) => {
-        notification.info({
-          message: "Remix contract deployed!",
-          placement: "bottomRight",
+      remixFactory.deploy(remix).then((tx) => {
+        tx.wait().then((receipt) => {
+          console.log(receipt)
+          notification.info({
+            message: "Remix contract deployed at: " + receipt.contractAddress,
+            placement: "bottomRight",
+          });
+          setIsDeploying(false);
+          setIsModalVisible(true);
         });
-        setIsDeploying(false);
-        setIsModalVisible(true);
       }).catch((error) => {
         setIsDeploying(false);
         console.log(error)

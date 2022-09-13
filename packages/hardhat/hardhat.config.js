@@ -11,6 +11,8 @@ require("@eth-optimism/hardhat-ovm");
 require("@nomiclabs/hardhat-ethers");
 require("@nomiclabs/hardhat-etherscan");
 
+require('dotenv').config({ path: __dirname + '/../react-app/.env' });
+
 const { isAddress, getAddress, formatUnits, parseUnits } = utils;
 
 /*
@@ -25,8 +27,13 @@ const { isAddress, getAddress, formatUnits, parseUnits } = utils;
 //
 // Select the network you want to deploy to here:
 //
-const defaultNetwork = "localhost";
-//const defaultNetwork = "rinkeby";
+
+var defaultNetwork = "localhost";
+if (process.env.REACT_APP_NETWORK) {
+  defaultNetwork = process.env.REACT_APP_NETWORK;
+}
+
+console.log("Default Network set to:", defaultNetwork)
 
 function mnemonic() {
   try {
@@ -58,31 +65,31 @@ module.exports = {
       */
     },
     rinkeby: {
-      url: "https://rinkeby.infura.io/v3/"+process.env.INFURA_ID, // <---- YOUR INFURA ID! (or it won't work)
+      url: "https://rinkeby.infura.io/v3/"+process.env.REACT_APP_INFURA_KEY, // <---- YOUR INFURA ID! (or it won't work)
       accounts: {
         mnemonic: mnemonic(),
       },
     },
     kovan: {
-      url: "https://kovan.infura.io/v3/"+process.env.INFURA_ID, // <---- YOUR INFURA ID! (or it won't work)
+      url: "https://kovan.infura.io/v3/"+process.env.REACT_APP_INFURA_KEY, // <---- YOUR INFURA ID! (or it won't work)
       accounts: {
         mnemonic: mnemonic(),
       },
     },
     mainnet: {
-      url: "https://mainnet.infura.io/v3/"+process.env.INFURA_ID, // <---- YOUR INFURA ID! (or it won't work)
+      url: "https://mainnet.infura.io/v3/"+process.env.REACT_APP_INFURA_KEY, // <---- YOUR INFURA ID! (or it won't work)
       accounts: {
         mnemonic: mnemonic(),
       },
     },
     ropsten: {
-      url: "https://ropsten.infura.io/v3/"+process.env.INFURA_ID, // <---- YOUR INFURA ID! (or it won't work)
+      url: "https://ropsten.infura.io/v3/"+process.env.REACT_APP_INFURA_KEY, // <---- YOUR INFURA ID! (or it won't work)
       accounts: {
         mnemonic: mnemonic(),
       },
     },
     goerli: {
-      url: "https://goerli.infura.io/v3/"+process.env.INFURA_ID, // <---- YOUR INFURA ID! (or it won't work)
+      url: "https://goerli.infura.io/v3/"+process.env.REACT_APP_INFURA_KEY, // <---- YOUR INFURA ID! (or it won't work)
       accounts: {
         mnemonic: mnemonic(),
       },

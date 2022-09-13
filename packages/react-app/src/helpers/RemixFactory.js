@@ -122,5 +122,7 @@ export class RemixFactory {
     async deploy(remix) {
         if (!this.signer) throw new Error("Signer is not set!");
         const tx = await this.contract.deploy(...remix.deployArgs);
+        console.log("Transaction:", tx)
+        return tx;
     }
 }
