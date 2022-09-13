@@ -1,88 +1,37 @@
 import { Row, Col, Modal } from "antd";
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { useRemixGraph } from "../../hooks";
-import { Graph } from "react-d3-graph"; 
+import ForceGraph3D from 'react-force-graph-3d';
+//import { Graph } from "react-d3-graph"; 
+import * as THREE from 'three'; 
 import { RemixContext } from "../../helpers";
 import { RemixContainer } from ".";
 
-const graphConfig = {
-  "automaticRearrangeAfterDropNode": true,
-  "collapsible": false,
-  "directed": true,
-  "focusAnimationDuration": 0.75,
-  "focusZoom": 1,
-  "freezeAllDragEvents": false,
-  "height": 600,
-  "highlightDegree": 1,
-  "highlightOpacity": 1,
-  "linkHighlightBehavior": false,
-  "maxZoom": 8,
-  "minZoom": 0.1,
-  "nodeHighlightBehavior": true,
-  "panAndZoom": true,
-  "staticGraph": false,
-  "staticGraphWithDragAndDrop": false,
-  "width": 800,
-  "d3": {
-    "alphaTarget": 0.05,
-    "gravity": -100,
-    "linkLength": 100,
-    "linkStrength": 1,
-    "disableLinkForce": false
-  },
-  "node": {
-    "color": "#d3d3d3",
-    "fontColor": "black",
-    "fontSize": 8,
-    "fontWeight": "normal",
-    "highlightColor": "SAME",
-    "highlightFontSize": 8,
-    "highlightFontWeight": "normal",
-    "highlightStrokeColor": "SAME",
-    "highlightStrokeWidth": "SAME",
-    "labelProperty": "name",
-    "labelPosition": "bottom",
-    "mouseCursor": "pointer",
-    "opacity": 1,
-    "renderLabel": false,
-    "strokeColor": "none",
-    "strokeWidth": 1.5,
-    "size":500,
-    "svg": '',
-    "symbolType": "circle"
-  },
-  "link": {
-    "color": "#d3d3d3",
-    "fontColor": "black",
-    "fontSize": 8,
-    "fontWeight": "normal",
-    "highlightColor": "SAME",
-    "highlightFontSize": 8,
-    "highlightFontWeight": "normal",
-    "labelProperty": "label",
-    "mouseCursor": "pointer",
-    "opacity": 1,
-    "renderLabel": false,
-    "semanticStrokeWidth": false,
-    "strokeWidth": 1.5,
-    "markerHeight": 6,
-    "markerWidth": 6,
-    "strokeDasharray": 0,
-    "strokeDashoffset": 0,
-    "strokeLinecap": "butt"
-  }
-}
 
 export default function RemixGraph(props) {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedRemix, setSelectedRemix] = useState();
   const [remixContext, setRemixContext] = useContext(RemixContext)
-  const [data, setData] = useState({});
+  const [data, setData] = useState({nodes: [], links: []});
   const graph = useRemixGraph(props.remixFactory);
+  const ref = useRef(null);
+  const [height, setHeight] = useState(0);
+  const [width, setWidth] = useState(0);
 
-  const onClickNode = function (nodeId) {
-    console.log(`Clicked node ${nodeId}`, remixContext.remixContracts[nodeId]);
-    setSelectedRemix(remixContext.remixContracts[nodeId]);
+  useEffect(() => {
+    setHeight(ref.current.offsetHeight);
+    setWidth(ref.current.offsetWidth);
+
+    // 👇️ if you need access to parent
+    // of the element on which you set the ref
+    console.log(ref.current.parentElement);
+    console.log(ref.current.parentElement.offsetHeight);
+    console.log(ref.current.parentElement.offsetWidth);
+  }, []);
+
+  const onClickNode = function (node) {
+    console.log(`Clicked node ${node.id}`, remixContext.remixContracts[node.id]);
+    setSelectedRemix(remixContext.remixContracts[node.id]);
     setIsModalVisible(true);
   };
 
@@ -98,9 +47,9 @@ export default function RemixGraph(props) {
       newData.nodes.push({
         id: node.id,
         name: remixContext.remixContracts[node.id].CollectibleMetadata ? remixContext.remixContracts[node.id].CollectibleMetadata.name : node.id,
-        //size: 200, // remixContext.remixContracts[node.id].RMXPrice ? Math.min(Math.max(remixContext.remixContracts[node.id].RMXPrice, 300), 600) : 300,
+        size: 50,
         color: "rgb(97, 205, 187)",
-        svg: remixContext.remixContracts[node.id].CollectibleMetadata ? remixContext.remixContracts[node.id].CollectibleMetadata.image : ""
+        image: remixContext.remixContracts[node.id].CollectibleMetadata ? remixContext.remixContracts[node.id].CollectibleMetadata.image : ""
       })
     })
     graph.forEachLink((link) => {
@@ -117,14 +66,21 @@ export default function RemixGraph(props) {
   return (
     <Row>
       <Col span={24}>
-        <div style={{ height: 600 }}>
-          <Graph
-            id="graph-id" // id is mandatory
-            data={data}
-            config={graphConfig}
-            onClickNode={onClickNode}
-            onClickLink={onClickLink}
-          />;
+        <div ref={ref} style={{ height: 600 }}>
+          <ForceGraph3D
+            graphData={data}
+            height={height}
+            width={width}
+            backgroundColor="#212121"
+            nodeThreeObject={({ image }) => {
+              const imgTexture = new THREE.TextureLoader().load(image);
+              const material = new THREE.SpriteMaterial({ map: imgTexture });
+              const sprite = new THREE.Sprite(material);
+              sprite.scale.set(12, 12);
+              return sprite;
+            }}
+            onNodeClick={onClickNode}
+          />
         </div>
       </Col>
       <Modal

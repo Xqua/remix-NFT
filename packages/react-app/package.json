@@ -48,10 +48,13 @@
     "react-css-theme-switcher": "^0.2.2",
     "react-d3-graph": "^2.6.0",
     "react-dom": "^16.14.0",
+    "react-force-graph-2d": "^1.23.11",
+    "react-force-graph-3d": "^1.21.13",
     "react-json-view": "^1.21.1",
     "react-qr-reader": "^2.2.1",
     "react-router-dom": "^5.2.0",
     "react-scripts": "^3.4.3",
+    "three": "^0.144.0",
     "web3modal": "^1.9.1"
   },
   "devDependencies": {
